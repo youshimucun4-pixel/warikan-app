@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>ふたりの割り勘帳</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#F5F0E8">
+
+  <!-- iOS (Safari) 対応 -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="割り勘帳">
+  <link rel="apple-touch-icon" href="icon-180.png">
+
+  <!-- Fonts -->
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Shippori+Mincho+B1:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+</head>
+<body>
+  <div id="app">
+
+    <!-- ====== 初期設定画面 ====== -->
+    <div id="setup-screen" class="screen">
+      <div class="setup-container">
+        <div class="setup-stamp">割</div>
+        <h1 class="setup-title">ふたりの<br>割り勘帳</h1>
+        <p class="setup-desc">ふたりの名前を登録して<br>はじめましょう</p>
+        <div class="setup-form">
+          <div class="setup-field">
+            <input type="text" id="user1-name" placeholder="ひとりめの名前" maxlength="10">
+          </div>
+          <div class="setup-ampersand">&amp;</div>
+          <div class="setup-field">
+            <input type="text" id="user2-name" placeholder="ふたりめの名前" maxlength="10">
+          </div>
+          <button id="start-btn" class="btn btn-warm btn-block">はじめる</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== メイン画面 ====== -->
+    <div id="main-screen" class="screen hidden">
+
+      <!-- ヘッダー -->
+      <header class="header anim-in" style="--delay:0">
+        <h1 class="header-title">割り勘帳</h1>
+        <button id="settings-btn" class="btn-icon" title="設定">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </header>
+
+      <!-- 月ナビゲーション -->
+      <nav class="month-nav anim-in" style="--delay:1">
+        <button id="prev-month" class="btn-icon" title="前月">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <h2 id="current-month" class="month-label"></h2>
+        <button id="next-month" class="btn-icon" title="次月">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </nav>
+
+      <!-- 帳簿サマリー -->
+      <section class="ledger anim-in" style="--delay:2">
+        <div class="ledger-top-rule"></div>
+        <div class="ledger-total">
+          <span class="ledger-total-label">合計支出</span>
+          <span class="ledger-total-amount" id="ledger-total">¥0</span>
+        </div>
+        <div class="ledger-rule"></div>
+        <div class="ledger-people">
+          <div class="ledger-person">
+            <span class="ledger-person-name" id="ledger-user1-name">—</span>
+            <span class="ledger-person-sub">支払い済</span>
+            <span class="ledger-person-amount" id="ledger-user1-paid">¥0</span>
+          </div>
+          <div class="ledger-person">
+            <span class="ledger-person-name" id="ledger-user2-name">—</span>
+            <span class="ledger-person-sub">支払い済</span>
+            <span class="ledger-person-amount" id="ledger-user2-paid">¥0</span>
+          </div>
+        </div>
+        <div class="ledger-rule"></div>
+        <div class="ledger-settlement" id="ledger-settlement">
+          <span class="settlement-text" id="settlement-text">まだ支出がありません</span>
+        </div>
+        <div class="ledger-bottom-rule"></div>
+      </section>
+
+      <!-- カテゴリ内訳 -->
+      <section class="category-section anim-in" style="--delay:3" id="category-section">
+        <div class="category-bar-track" id="category-bar"></div>
+        <div class="category-legend" id="category-legend"></div>
+      </section>
+
+      <!-- 支出一覧 -->
+      <section class="expense-section anim-in" style="--delay:4">
+        <div class="expense-list-header">
+          <h3>支出一覧</h3>
+          <span class="expense-count" id="expense-count">0件</span>
+        </div>
+        <div class="expense-list" id="expense-list">
+          <div class="empty-state" id="empty-state">
+            <p class="empty-main">まだ支出がありません</p>
+            <p class="empty-sub">下の＋ボタンから追加しましょう</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- FAB -->
+      <button id="add-btn" class="fab" title="支出を追加">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+    </div>
+
+    <!-- ====== 支出追加/編集モーダル ====== -->
+    <div id="expense-modal" class="modal hidden">
+      <div class="modal-overlay"></div>
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <h2 id="modal-title">支出を追加</h2>
+          <button id="modal-close" class="btn-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <form id="expense-form" class="modal-body">
+          <!-- カテゴリ -->
+          <div class="form-group">
+            <label>カテゴリ</label>
+            <div class="category-grid" id="category-grid"></div>
+          </div>
+          <!-- 内容 -->
+          <div class="form-group">
+            <label for="expense-desc">内容</label>
+            <input type="text" id="expense-desc" placeholder="例：スーパーで買い物" required>
+          </div>
+          <!-- 金額 -->
+          <div class="form-group">
+            <label for="expense-amount">金額</label>
+            <div class="input-yen">
+              <span class="yen-mark">¥</span>
+              <input type="number" id="expense-amount" placeholder="0" min="1" required>
+            </div>
+          </div>
+          <!-- 日付 -->
+          <div class="form-group">
+            <label for="expense-date">日付</label>
+            <input type="date" id="expense-date" required>
+          </div>
+          <!-- 支払った人 -->
+          <div class="form-group">
+            <label>支払った人</label>
+            <div class="payer-toggle">
+              <label class="payer-option">
+                <input type="radio" name="paid-by" value="user1" checked>
+                <span class="payer-label" id="payer-user1-name"></span>
+              </label>
+              <label class="payer-option">
+                <input type="radio" name="paid-by" value="user2">
+                <span class="payer-label" id="payer-user2-name"></span>
+              </label>
+            </div>
+          </div>
+          <!-- 負担割合 -->
+          <div class="form-group">
+            <label>負担割合</label>
+            <div class="split-options">
+              <label class="split-pill"><input type="radio" name="split-type" value="equal" checked><span>半々</span></label>
+              <label class="split-pill"><input type="radio" name="split-type" value="custom"><span>カスタム</span></label>
+              <label class="split-pill"><input type="radio" name="split-type" value="full"><span>全額片方</span></label>
+            </div>
+          </div>
+          <!-- カスタム割合 -->
+          <div id="custom-split" class="form-group hidden">
+            <div class="custom-split-row">
+              <div class="custom-split-side">
+                <span class="split-name" id="split-user1-name"></span>
+                <div class="input-pct"><input type="number" id="split-user1-pct" value="50" min="0" max="100"><span>%</span></div>
+              </div>
+              <div class="custom-split-sep">:</div>
+              <div class="custom-split-side">
+                <span class="split-name" id="split-user2-name"></span>
+                <div class="input-pct"><input type="number" id="split-user2-pct" value="50" min="0" max="100"><span>%</span></div>
+              </div>
+            </div>
+            <div class="split-hint" id="split-hint"></div>
+          </div>
+          <!-- 全額片方 -->
+          <div id="full-split" class="form-group hidden">
+            <label>全額負担する人</label>
+            <div class="payer-toggle">
+              <label class="payer-option">
+                <input type="radio" name="full-payer" value="user1" checked>
+                <span class="payer-label" id="full-user1-name"></span>
+              </label>
+              <label class="payer-option">
+                <input type="radio" name="full-payer" value="user2">
+                <span class="payer-label" id="full-user2-name"></span>
+              </label>
+            </div>
+          </div>
+          <!-- ボタン -->
+          <div class="form-actions">
+            <button type="button" id="delete-expense-btn" class="btn btn-ghost-danger hidden">削除</button>
+            <button type="submit" class="btn btn-warm">保存する</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ====== 設定モーダル ====== -->
+    <div id="settings-modal" class="modal hidden">
+      <div class="modal-overlay"></div>
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <h2>設定</h2>
+          <button id="settings-close" class="btn-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="settings-user1">ひとりめの名前</label>
+            <input type="text" id="settings-user1" maxlength="10">
+          </div>
+          <div class="form-group">
+            <label for="settings-user2">ふたりめの名前</label>
+            <input type="text" id="settings-user2" maxlength="10">
+          </div>
+          <div class="form-actions">
+            <button id="settings-save" class="btn btn-warm">保存</button>
+          </div>
+          <div class="settings-extra">
+            <h4>データ管理</h4>
+            <button id="export-btn" class="btn btn-outline">エクスポート</button>
+            <label class="btn btn-outline import-label">
+              インポート
+              <input type="file" id="import-input" accept=".json" hidden>
+            </label>
+            <button id="reset-btn" class="btn btn-ghost-danger">すべてのデータを削除</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== 確認ダイアログ ====== -->
+    <div id="confirm-dialog" class="modal hidden">
+      <div class="modal-overlay"></div>
+      <div class="modal-dialog">
+        <p id="confirm-message"></p>
+        <div class="dialog-actions">
+          <button id="confirm-cancel" class="btn btn-outline">キャンセル</button>
+          <button id="confirm-ok" class="btn btn-ghost-danger">削除する</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <script src="app.js"></script>
+  <script>
+    // Service Worker 登録
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js')
+        .then(() => console.log('SW registered'))
+        .catch(e => console.warn('SW registration failed:', e));
+    }
+
+    // iOS 用 apple-touch-icon を Canvas で動的生成
+    (function generateAppleTouchIcon() {
+      try {
+        const s = 180;
+        const c = document.createElement('canvas');
+        c.width = s; c.height = s;
+        const ctx = c.getContext('2d');
+        // 背景
+        ctx.fillStyle = '#F5F0E8';
+        ctx.beginPath();
+        ctx.roundRect(0, 0, s, s, s * 0.22);
+        ctx.fill();
+        // 外輪
+        ctx.strokeStyle = 'rgba(198,93,62,.3)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(s/2, s/2, s*0.38, 0, Math.PI*2);
+        ctx.stroke();
+        // 内輪
+        ctx.strokeStyle = '#C65D3E';
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.arc(s/2, s/2, s*0.32, 0, Math.PI*2);
+        ctx.stroke();
+        // 文字
+        ctx.fillStyle = '#C65D3E';
+        ctx.font = '700 68px serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('割', s/2, s/2 + 2);
+        // 設定
+        const url = c.toDataURL('image/png');
+        const link = document.querySelector('link[rel="apple-touch-icon"]');
+        if (link) link.href = url;
+        // 192/512 用も保存不要（manifest.json の SVG が使われる）
+      } catch(e) {}
+    })();
+  </script>
+</body>
+</html>
