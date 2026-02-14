@@ -14,12 +14,12 @@
 //
 // 設定しない場合はオフライン（localStorage）モードで動作します
 const FIREBASE_CONFIG = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.firebasestorage.app",
-  messagingSenderId: "000000000000",
-  appId: "1:000:web:000"
+  apiKey: "AIzaSyCOZlp4MGNOb0lxE1AHhS1Vvdg1qcXPDpA",
+  authDomain: "warikan-253f7.firebaseapp.com",
+  projectId: "warikan-253f7",
+  storageBucket: "warikan-253f7.firebasestorage.app",
+  messagingSenderId: "366544943601",
+  appId: "1:366544943601:web:5a1a2119f6b26a72e2ec50"
 };
 
 // ==================== Firebase 初期化 ====================
