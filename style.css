@@ -974,6 +974,158 @@ body {
   }
 }
 
+/* ============================================
+   SETUP STEPS
+   ============================================ */
+.setup-step { width: 100%; max-width: 320px; }
+.setup-step.hidden { display: none; }
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--ink-light);
+  font-family: var(--ff-sans);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 8px 0;
+  transition: color var(--transition);
+}
+.btn-link:hover { color: var(--ink); }
+
+.setup-hint {
+  font-size: 11px;
+  color: var(--ink-faint);
+  text-align: center;
+  margin-top: 4px;
+}
+
+/* Room code card */
+.room-code-card {
+  text-align: center;
+  padding: 20px;
+  background: var(--paper);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-bottom: 12px;
+}
+
+.room-code-label {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-light);
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+}
+
+.room-code-value {
+  font-family: var(--ff-num);
+  font-size: 36px;
+  font-weight: 600;
+  letter-spacing: 6px;
+  color: var(--terracotta);
+  margin-bottom: 10px;
+}
+
+.btn-sm {
+  padding: 6px 16px;
+  font-size: 12px;
+}
+
+.room-code-hint {
+  font-size: 12px;
+  color: var(--ink-light);
+  line-height: 1.6;
+  margin-top: 10px;
+}
+
+/* Join code input */
+#join-code-input {
+  text-transform: uppercase;
+  letter-spacing: 6px;
+  font-size: 22px;
+  font-family: var(--ff-num);
+  font-weight: 600;
+  text-align: center;
+  color: var(--terracotta);
+}
+
+/* Spinner */
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--terracotta);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  margin: 0 auto 16px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ============================================
+   SYNC BADGE & HEADER RIGHT
+   ============================================ */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sync-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--sage);
+  background: var(--sage-pale);
+  padding: 2px 8px;
+  border-radius: 10px;
+  letter-spacing: .3px;
+}
+
+/* ============================================
+   SETTINGS ROOM CODE
+   ============================================ */
+.room-code-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--cream);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.room-code-mono {
+  font-family: var(--ff-num);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 4px;
+  color: var(--terracotta);
+  flex: 1;
+}
+
+.btn-copy {
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-family: var(--ff-sans);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-mid);
+  cursor: pointer;
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+.btn-copy:hover { background: var(--cream-deep); }
+
+.room-code-hint-sm {
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-top: 6px;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
