@@ -66,6 +66,8 @@ let editingExpenseId = null;
 let selectedCategory = 'other';
 let unsubRoom = null;
 let unsubExpenses = null;
+let currentTab = 'record';
+let trendCategoryFilter = 'all';
 
 // ==================== DOM ====================
 const $ = id => document.getElementById(id);
@@ -372,6 +374,10 @@ function renderMonth() {
   renderExpenses();
   renderSummary();
   renderCategoryChart();
+  if (currentTab === 'analytics') {
+    renderDonutChart();
+    renderTrendChart();
+  }
 }
 
 function navigateMonth(offset) {
@@ -415,7 +421,7 @@ function renderSummary() {
   }
 }
 
-// ==================== カテゴリチャート ====================
+// ==================== カテゴリバー（記録タブ） ====================
 function renderCategoryChart() {
   const exps = getMonthExpenses();
   if (exps.length === 0) { dom.categorySection.classList.add('hidden'); return; }
@@ -440,6 +446,194 @@ function renderCategoryChart() {
     item.className = 'category-legend-item';
     item.innerHTML = `<span class="category-dot" style="background:${cat.color}"></span>${cat.emoji} ${cat.name} <span class="category-legend-amount">${yen(amt)}</span>`;
     dom.categoryLegend.appendChild(item);
+  });
+}
+
+// ==================== タブ切り替え ====================
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+  $('panel-record').classList.toggle('hidden', tab !== 'record');
+  $('panel-analytics').classList.toggle('hidden', tab !== 'analytics');
+  if (tab === 'analytics') {
+    renderDonutChart();
+    buildTrendFilters();
+    renderTrendChart();
+  }
+}
+
+// ==================== ドーナツチャート ====================
+function renderDonutChart() {
+  const exps = getMonthExpenses();
+  const svg = $('donut-svg');
+  const legend = $('donut-legend');
+  const emptyEl = $('donut-empty');
+  const totalEl = $('donut-total');
+
+  if (exps.length === 0) {
+    svg.innerHTML = '';
+    legend.innerHTML = '';
+    totalEl.textContent = '¥0';
+    emptyEl.classList.remove('hidden');
+    svg.parentElement.style.display = 'none';
+    return;
+  }
+  emptyEl.classList.add('hidden');
+  svg.parentElement.style.display = '';
+
+  const totals = {};
+  let grandTotal = 0;
+  exps.forEach(e => {
+    const c = e.category || 'other';
+    totals[c] = (totals[c] || 0) + e.amount;
+    grandTotal += e.amount;
+  });
+  totalEl.textContent = yen(grandTotal);
+
+  const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+  const cx = 95, cy = 95, r = 70;
+  const circumference = 2 * Math.PI * r;
+  const strokeWidth = 26;
+  const gapAngle = 1.5;
+  const gapLen = (gapAngle / 360) * circumference;
+  const segCount = sorted.length;
+  const totalGap = segCount > 1 ? gapLen * segCount : 0;
+  const availableLen = circumference - totalGap;
+
+  let circles = '';
+  let offset = 0;
+  sorted.forEach(([catId, amt]) => {
+    const cat = getCategoryById(catId);
+    const pct = amt / grandTotal;
+    const arcLen = Math.max(pct * availableLen, 2);
+    circles += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none"
+      stroke="${cat.color}" stroke-width="${strokeWidth}"
+      stroke-dasharray="${arcLen} ${circumference}"
+      stroke-dashoffset="${-offset}"
+      stroke-linecap="round"
+      transform="rotate(-90 ${cx} ${cy})"
+      style="transition: stroke-dasharray .5s ease, stroke-dashoffset .5s ease;"/>`;
+    offset += arcLen + (segCount > 1 ? gapLen : 0);
+  });
+
+  const bgCircle = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none"
+    stroke="var(--cream-deep)" stroke-width="${strokeWidth}" opacity="0.5"/>`;
+  svg.innerHTML = bgCircle + circles;
+
+  legend.innerHTML = '';
+  sorted.forEach(([catId, amt]) => {
+    const cat = getCategoryById(catId);
+    const pct = (amt / grandTotal * 100).toFixed(1);
+    const item = document.createElement('div');
+    item.className = 'donut-legend-item';
+    item.innerHTML = `
+      <span class="donut-legend-dot" style="background:${cat.color}"></span>
+      <span class="donut-legend-emoji">${cat.emoji}</span>
+      <span class="donut-legend-name">${cat.name}</span>
+      <span class="donut-legend-pct">${pct}%</span>
+      <span class="donut-legend-amount">${yen(amt)}</span>
+    `;
+    legend.appendChild(item);
+  });
+}
+
+// ==================== 月別推移チャート ====================
+function buildTrendFilters() {
+  const container = $('trend-filters');
+  container.innerHTML = '';
+  const allBtn = document.createElement('button');
+  allBtn.className = 'trend-filter-btn' + (trendCategoryFilter === 'all' ? ' active' : '');
+  allBtn.textContent = 'すべて';
+  allBtn.addEventListener('click', () => { trendCategoryFilter = 'all'; buildTrendFilters(); renderTrendChart(); });
+  container.appendChild(allBtn);
+
+  CATEGORIES.forEach(cat => {
+    const btn = document.createElement('button');
+    btn.className = 'trend-filter-btn' + (trendCategoryFilter === cat.id ? ' active' : '');
+    btn.textContent = cat.emoji + ' ' + cat.name;
+    btn.addEventListener('click', () => { trendCategoryFilter = cat.id; buildTrendFilters(); renderTrendChart(); });
+    container.appendChild(btn);
+  });
+}
+
+function getTrendData() {
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
+    months.push(shiftMonth(currentMonth, -i));
+  }
+
+  return months.map(m => {
+    const mExps = appData.expenses.filter(e => e.date && e.date.startsWith(m));
+    let total = 0;
+    const catTotals = {};
+
+    mExps.forEach(e => {
+      const catId = e.category || 'other';
+      const matchFilter = trendCategoryFilter === 'all' || catId === trendCategoryFilter;
+      if (matchFilter) {
+        total += e.amount;
+        catTotals[catId] = (catTotals[catId] || 0) + e.amount;
+      }
+    });
+
+    const [, mm] = m.split('-');
+    return { month: m, label: parseInt(mm) + '月', total, catTotals };
+  });
+}
+
+function renderTrendChart() {
+  const container = $('trend-chart');
+  const data = getTrendData();
+  const maxTotal = Math.max(...data.map(d => d.total), 1);
+
+  container.innerHTML = '';
+  data.forEach((d, i) => {
+    const col = document.createElement('div');
+    col.className = 'trend-col';
+
+    const barWrap = document.createElement('div');
+    barWrap.className = 'trend-bar-wrap';
+
+    if (d.total > 0) {
+      const heightPct = (d.total / maxTotal * 100);
+
+      if (trendCategoryFilter === 'all') {
+        const sorted = Object.entries(d.catTotals).sort((a, b) => b[1] - a[1]);
+        sorted.forEach(([catId, amt]) => {
+          const cat = getCategoryById(catId);
+          const seg = document.createElement('div');
+          seg.className = 'trend-bar-seg';
+          seg.style.height = (amt / maxTotal * 100) + '%';
+          seg.style.background = cat.color;
+          barWrap.appendChild(seg);
+        });
+      } else {
+        const cat = getCategoryById(trendCategoryFilter);
+        const seg = document.createElement('div');
+        seg.className = 'trend-bar-seg';
+        seg.style.height = heightPct + '%';
+        seg.style.background = cat.color;
+        barWrap.appendChild(seg);
+      }
+
+      const amtLabel = document.createElement('span');
+      amtLabel.className = 'trend-bar-amount';
+      amtLabel.textContent = d.total >= 10000 ? Math.round(d.total / 10000) + '万' : yen(d.total);
+      col.appendChild(amtLabel);
+    }
+
+    col.appendChild(barWrap);
+
+    const label = document.createElement('span');
+    label.className = 'trend-label';
+    label.textContent = d.label;
+    if (d.month === currentMonth) label.classList.add('trend-label-current');
+    col.appendChild(label);
+
+    col.style.setProperty('--bar-i', i);
+    container.appendChild(col);
   });
 }
 
@@ -780,6 +974,11 @@ function setupEvents() {
     showScreen(dom.mainScreen);
     syncNames();
     renderMonth();
+  });
+
+  // === タブ ===
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   });
 
   // === 月ナビ ===

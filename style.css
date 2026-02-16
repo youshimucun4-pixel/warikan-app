@@ -262,6 +262,64 @@ body {
 }
 
 /* ============================================
+   TAB BAR
+   ============================================ */
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  padding: 10px 16px 0;
+  background: var(--paper);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 53px;
+  z-index: 9;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 10px 0;
+  border: none;
+  background: transparent;
+  font-family: var(--ff-sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-faint);
+  cursor: pointer;
+  transition: all var(--transition);
+  position: relative;
+  letter-spacing: 1px;
+}
+
+.tab-btn::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 20%;
+  right: 20%;
+  height: 2.5px;
+  border-radius: 2px;
+  background: transparent;
+  transition: all .3s cubic-bezier(.22,1,.36,1);
+}
+
+.tab-btn.active {
+  color: var(--terracotta);
+}
+
+.tab-btn.active::after {
+  background: var(--terracotta);
+  left: 15%;
+  right: 15%;
+}
+
+.tab-btn:hover:not(.active) {
+  color: var(--ink-light);
+}
+
+.panel { }
+.panel.hidden { display: none !important; }
+
+/* ============================================
    MONTH NAV
    ============================================ */
 .month-nav {
@@ -1124,6 +1182,244 @@ body {
   font-size: 11px;
   color: var(--ink-faint);
   margin-top: 6px;
+}
+
+/* ============================================
+   ANALYTICS — CHART CARD
+   ============================================ */
+.chart-card {
+  margin: 14px 16px 0;
+  background: var(--paper);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-md);
+  animation: fadeSlideUp .5s cubic-bezier(.22,1,.36,1) both;
+}
+
+.chart-card + .chart-card {
+  margin-top: 14px;
+}
+
+.chart-title {
+  font-family: var(--ff-serif);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  margin-bottom: 16px;
+  color: var(--ink);
+}
+
+/* ============================================
+   DONUT CHART
+   ============================================ */
+.donut-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.donut-container {
+  position: relative;
+  width: 190px;
+  height: 190px;
+}
+
+.donut-container svg {
+  display: block;
+}
+
+.donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.donut-center-amount {
+  font-family: var(--ff-num);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -.5px;
+  line-height: 1.2;
+}
+
+.donut-center-label {
+  font-size: 11px;
+  color: var(--ink-light);
+  letter-spacing: 1px;
+  margin-top: 2px;
+}
+
+.donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.donut-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition);
+}
+
+.donut-legend-item:hover {
+  background: var(--cream);
+}
+
+.donut-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.donut-legend-emoji {
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.donut-legend-name {
+  flex: 1;
+  font-weight: 500;
+}
+
+.donut-legend-pct {
+  font-family: var(--ff-num);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-light);
+  min-width: 40px;
+  text-align: right;
+}
+
+.donut-legend-amount {
+  font-family: var(--ff-num);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  min-width: 65px;
+  text-align: right;
+}
+
+.donut-empty {
+  text-align: center;
+  padding: 30px 0;
+  color: var(--ink-light);
+  font-size: 13px;
+}
+
+/* ============================================
+   TREND CHART
+   ============================================ */
+.trend-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.trend-filter-btn {
+  padding: 5px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  background: var(--cream);
+  font-family: var(--ff-sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-mid);
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+
+.trend-filter-btn:hover {
+  border-color: var(--border-strong);
+}
+
+.trend-filter-btn.active {
+  border-color: var(--terracotta);
+  background: var(--terracotta-pale);
+  color: var(--terracotta-deep);
+}
+
+.trend-chart-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -4px;
+  padding: 0 4px;
+}
+
+.trend-chart {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  min-height: 180px;
+  padding-top: 24px;
+}
+
+.trend-col {
+  flex: 1;
+  min-width: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  animation: fadeSlideUp .4s cubic-bezier(.22,1,.36,1) both;
+  animation-delay: calc(var(--bar-i, 0) * .06s);
+}
+
+.trend-bar-wrap {
+  width: 100%;
+  max-width: 38px;
+  height: 120px;
+  display: flex;
+  flex-direction: column-reverse;
+  border-radius: 6px 6px 2px 2px;
+  overflow: hidden;
+  background: var(--cream-deep);
+}
+
+.trend-bar-seg {
+  width: 100%;
+  transition: height .5s cubic-bezier(.22,1,.36,1);
+  min-height: 0;
+}
+
+.trend-bar-seg:last-child {
+  border-radius: 4px 4px 0 0;
+}
+
+.trend-bar-amount {
+  font-family: var(--ff-num);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-mid);
+  white-space: nowrap;
+}
+
+.trend-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-light);
+}
+
+.trend-label-current {
+  color: var(--terracotta);
+  font-weight: 700;
+}
+
+/* Analytics section bottom padding */
+#panel-analytics {
+  padding-bottom: 110px;
 }
 
 /* Scrollbar */

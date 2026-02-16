@@ -124,8 +124,14 @@
         </div>
       </header>
 
-      <!-- 月ナビゲーション -->
-      <nav class="month-nav anim-in" style="--delay:1">
+      <!-- タブバー -->
+      <div class="tab-bar anim-in" style="--delay:1">
+        <button class="tab-btn active" data-tab="record">記録</button>
+        <button class="tab-btn" data-tab="analytics">分析</button>
+      </div>
+
+      <!-- 月ナビゲーション (共通) -->
+      <nav class="month-nav anim-in" style="--delay:2">
         <button id="prev-month" class="btn-icon" title="前月">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
@@ -135,52 +141,82 @@
         </button>
       </nav>
 
-      <!-- 帳簿サマリー -->
-      <section class="ledger anim-in" style="--delay:2">
-        <div class="ledger-top-rule"></div>
-        <div class="ledger-total">
-          <span class="ledger-total-label">合計支出</span>
-          <span class="ledger-total-amount" id="ledger-total">¥0</span>
-        </div>
-        <div class="ledger-rule"></div>
-        <div class="ledger-people">
-          <div class="ledger-person">
-            <span class="ledger-person-name" id="ledger-user1-name">—</span>
-            <span class="ledger-person-sub">支払い済</span>
-            <span class="ledger-person-amount" id="ledger-user1-paid">¥0</span>
+      <!-- ====== 記録パネル ====== -->
+      <div id="panel-record" class="panel">
+        <section class="ledger anim-in" style="--delay:3">
+          <div class="ledger-top-rule"></div>
+          <div class="ledger-total">
+            <span class="ledger-total-label">合計支出</span>
+            <span class="ledger-total-amount" id="ledger-total">¥0</span>
           </div>
-          <div class="ledger-person">
-            <span class="ledger-person-name" id="ledger-user2-name">—</span>
-            <span class="ledger-person-sub">支払い済</span>
-            <span class="ledger-person-amount" id="ledger-user2-paid">¥0</span>
+          <div class="ledger-rule"></div>
+          <div class="ledger-people">
+            <div class="ledger-person">
+              <span class="ledger-person-name" id="ledger-user1-name">—</span>
+              <span class="ledger-person-sub">支払い済</span>
+              <span class="ledger-person-amount" id="ledger-user1-paid">¥0</span>
+            </div>
+            <div class="ledger-person">
+              <span class="ledger-person-name" id="ledger-user2-name">—</span>
+              <span class="ledger-person-sub">支払い済</span>
+              <span class="ledger-person-amount" id="ledger-user2-paid">¥0</span>
+            </div>
           </div>
-        </div>
-        <div class="ledger-rule"></div>
-        <div class="ledger-settlement" id="ledger-settlement">
-          <span class="settlement-text" id="settlement-text">まだ支出がありません</span>
-        </div>
-        <div class="ledger-bottom-rule"></div>
-      </section>
+          <div class="ledger-rule"></div>
+          <div class="ledger-settlement" id="ledger-settlement">
+            <span class="settlement-text" id="settlement-text">まだ支出がありません</span>
+          </div>
+          <div class="ledger-bottom-rule"></div>
+        </section>
 
-      <!-- カテゴリ内訳 -->
-      <section class="category-section anim-in" style="--delay:3" id="category-section">
-        <div class="category-bar-track" id="category-bar"></div>
-        <div class="category-legend" id="category-legend"></div>
-      </section>
+        <section class="category-section" id="category-section">
+          <div class="category-bar-track" id="category-bar"></div>
+          <div class="category-legend" id="category-legend"></div>
+        </section>
 
-      <!-- 支出一覧 -->
-      <section class="expense-section anim-in" style="--delay:4">
-        <div class="expense-list-header">
-          <h3>支出一覧</h3>
-          <span class="expense-count" id="expense-count">0件</span>
-        </div>
-        <div class="expense-list" id="expense-list">
-          <div class="empty-state" id="empty-state">
-            <p class="empty-main">まだ支出がありません</p>
-            <p class="empty-sub">下の＋ボタンから追加しましょう</p>
+        <section class="expense-section">
+          <div class="expense-list-header">
+            <h3>支出一覧</h3>
+            <span class="expense-count" id="expense-count">0件</span>
           </div>
-        </div>
-      </section>
+          <div class="expense-list" id="expense-list">
+            <div class="empty-state" id="empty-state">
+              <p class="empty-main">まだ支出がありません</p>
+              <p class="empty-sub">下の＋ボタンから追加しましょう</p>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- ====== 分析パネル ====== -->
+      <div id="panel-analytics" class="panel hidden">
+        <!-- ドーナツチャート -->
+        <section class="chart-card">
+          <h3 class="chart-title">カテゴリ別支出</h3>
+          <div class="donut-wrap">
+            <div class="donut-container" id="donut-container">
+              <svg id="donut-svg" width="190" height="190" viewBox="0 0 190 190"></svg>
+              <div class="donut-center">
+                <span class="donut-center-amount" id="donut-total">¥0</span>
+                <span class="donut-center-label">合計</span>
+              </div>
+            </div>
+          </div>
+          <div class="donut-legend" id="donut-legend"></div>
+          <div class="donut-empty hidden" id="donut-empty">
+            <p>この月のデータがありません</p>
+          </div>
+        </section>
+
+        <!-- 月別推移 -->
+        <section class="chart-card">
+          <h3 class="chart-title">月別推移（6ヶ月）</h3>
+          <div class="trend-filters" id="trend-filters"></div>
+          <div class="trend-chart-wrap">
+            <div class="trend-chart" id="trend-chart"></div>
+          </div>
+        </section>
+      </div>
 
       <!-- FAB -->
       <button id="add-btn" class="fab" title="支出を追加">
