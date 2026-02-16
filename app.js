@@ -1,18 +1,8 @@
 /* =============================================
-   ふたりの割り勘帳 — App Logic (Firebase Sync)
+   割り勘帳 — App Logic (Multi-group + Firebase)
    ============================================= */
 
 // ==================== Firebase 設定 ====================
-// ★★★ 以下の手順で Firebase を設定してください ★★★
-// 1. https://console.firebase.google.com/ にアクセス（Google アカウントでログイン）
-// 2. 「プロジェクトを追加」→ 好きな名前（例: warikan）→ 作成
-// 3. 左メニュー「構築」→「Firestore Database」→「データベースを作成」
-// 4. ロケーション: asia-northeast1 (東京) → 「テストモードで開始」→ 作成
-// 5. プロジェクト設定（左上の歯車）→「全般」タブ下の「マイアプリ」→「</>（ウェブ）」
-// 6. アプリのニックネーム（例: warikan-web）→ 登録
-// 7. 表示される firebaseConfig の値を下記に貼り付け
-//
-// 設定しない場合はオフライン（localStorage）モードで動作します
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyCOZlp4MGNOb0lxE1AHhS1Vvdg1qcXPDpA",
   authDomain: "warikan-253f7.firebaseapp.com",
@@ -55,10 +45,16 @@ function getCategoryById(id) {
 }
 
 // ==================== グローバル変数 ====================
+const GROUPS_KEY = 'warikan-groups';
 const ROOM_KEY = 'warikan-room-code';
 const LOCAL_KEY = 'warikan-app-data';
 
-let roomCode = localStorage.getItem(ROOM_KEY) || '';
+let groups = [];
+let activeGroup = null;
+let actionGroup = null;
+let archivedExpanded = false;
+
+let roomCode = '';
 let appData = { users: { user1: '', user2: '' }, expenses: [] };
 const _now = new Date();
 let currentMonth = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}`;
@@ -73,46 +69,53 @@ let trendCategoryFilter = 'all';
 const $ = id => document.getElementById(id);
 
 const dom = {
+  homeScreen: $('home-screen'),
   setupScreen: $('setup-screen'),
   mainScreen: $('main-screen'),
-  // Setup steps
+  groupList: $('group-list'),
+  archivedSection: $('archived-section'),
+  archivedList: $('archived-list'),
+  addGroupBtn: $('add-group-btn'),
+  homeLimitText: $('home-limit-text'),
+  toggleArchived: $('toggle-archived'),
+  archivedToggleIcon: $('archived-toggle-icon'),
   stepChoice: $('step-choice'),
   stepCreate: $('step-create'),
   stepCode: $('step-code'),
   stepJoin: $('step-join'),
   stepLoading: $('step-loading'),
   stepLocal: $('step-local'),
-  // Setup inputs
+  groupNameInput: $('group-name-input'),
   user1Name: $('user1-name'),
   user2Name: $('user2-name'),
+  joinGroupName: $('join-group-name'),
   joinCodeInput: $('join-code-input'),
   displayCode: $('display-code'),
+  localGroupName: $('local-group-name'),
   localUser1: $('local-user1'),
   localUser2: $('local-user2'),
-  // Header
+  btnSetupBack: $('btn-setup-back'),
+  btnSetupBackLocal: $('btn-setup-back-local'),
+  backToHome: $('back-to-home'),
+  headerGroupName: $('header-group-name'),
   settingsBtn: $('settings-btn'),
   syncBadge: $('sync-badge'),
-  // Month nav
   prevMonth: $('prev-month'),
   nextMonth: $('next-month'),
   currentMonth: $('current-month'),
-  // Ledger
   ledgerTotal: $('ledger-total'),
   ledgerUser1Name: $('ledger-user1-name'),
   ledgerUser2Name: $('ledger-user2-name'),
   ledgerUser1Paid: $('ledger-user1-paid'),
   ledgerUser2Paid: $('ledger-user2-paid'),
   settlementText: $('settlement-text'),
-  // Category
   categoryBar: $('category-bar'),
   categoryLegend: $('category-legend'),
   categorySection: $('category-section'),
-  // Expenses
   expenseList: $('expense-list'),
   expenseCount: $('expense-count'),
   emptyState: $('empty-state'),
   addBtn: $('add-btn'),
-  // Expense modal
   expenseModal: $('expense-modal'),
   modalTitle: $('modal-title'),
   modalClose: $('modal-close'),
@@ -127,9 +130,9 @@ const dom = {
   splitUser1Pct: $('split-user1-pct'),
   splitUser2Pct: $('split-user2-pct'),
   splitHint: $('split-hint'),
-  // Settings modal
   settingsModal: $('settings-modal'),
   settingsClose: $('settings-close'),
+  settingsGroupName: $('settings-group-name'),
   settingsUser1: $('settings-user1'),
   settingsUser2: $('settings-user2'),
   settingsSave: $('settings-save'),
@@ -137,7 +140,17 @@ const dom = {
   settingsRoomCode: $('settings-room-code'),
   exportBtn: $('export-btn'),
   resetBtn: $('reset-btn'),
-  // Confirm
+  groupActionModal: $('group-action-modal'),
+  groupActionName: $('group-action-name'),
+  groupActionClose: $('group-action-close'),
+  actionRename: $('action-rename'),
+  actionArchive: $('action-archive'),
+  actionArchiveLabel: $('action-archive-label'),
+  actionDelete: $('action-delete'),
+  renameModal: $('rename-modal'),
+  renameInput: $('rename-input'),
+  renameCancel: $('rename-cancel'),
+  renameOk: $('rename-ok'),
   confirmDialog: $('confirm-dialog'),
   confirmMessage: $('confirm-message'),
   confirmCancel: $('confirm-cancel'),
@@ -197,6 +210,7 @@ async function copyToClipboard(text) {
 
 // ==================== 画面制御 ====================
 function showScreen(screen) {
+  dom.homeScreen.classList.add('hidden');
   dom.setupScreen.classList.add('hidden');
   dom.mainScreen.classList.add('hidden');
   screen.classList.remove('hidden');
@@ -208,14 +222,233 @@ function showSetupStep(step) {
   step.classList.remove('hidden');
 }
 
-// ==================== localStorage 管理 ====================
-function saveLocal() {
-  try { localStorage.setItem(LOCAL_KEY, JSON.stringify(appData)); } catch {}
+// ==================== グループ管理 ====================
+function loadGroupsList() {
+  try {
+    const raw = localStorage.getItem(GROUPS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
 }
 
-function loadLocal() {
+function saveGroupsList() {
+  try { localStorage.setItem(GROUPS_KEY, JSON.stringify(groups)); } catch {}
+}
+
+function addGroupEntry(code, name, isLocal, members) {
+  groups.push({ code, name, archived: false, isLocal, members: members || '' });
+  saveGroupsList();
+}
+
+function removeGroupEntry(code) {
+  const g = groups.find(x => x.code === code);
+  groups = groups.filter(x => x.code !== code);
+  saveGroupsList();
+  if (g && g.isLocal) {
+    localStorage.removeItem('warikan-local-' + code);
+  }
+}
+
+function archiveGroupEntry(code) {
+  const g = groups.find(x => x.code === code);
+  if (g) { g.archived = true; saveGroupsList(); }
+}
+
+function unarchiveGroupEntry(code) {
+  const g = groups.find(x => x.code === code);
+  if (g) { g.archived = false; saveGroupsList(); }
+}
+
+function renameGroupEntry(code, newName) {
+  const g = groups.find(x => x.code === code);
+  if (g) { g.name = newName; saveGroupsList(); }
+}
+
+function updateGroupMembers(code, members) {
+  const g = groups.find(x => x.code === code);
+  if (g) { g.members = members; saveGroupsList(); }
+}
+
+function getActiveGroupEntries() {
+  return groups.filter(g => !g.archived);
+}
+
+function getArchivedGroupEntries() {
+  return groups.filter(g => g.archived);
+}
+
+function canCreateGroup() {
+  return getActiveGroupEntries().length < 3;
+}
+
+// ==================== ホーム画面 ====================
+function showHomeScreen() {
+  renderGroupList();
+  showScreen(dom.homeScreen);
+}
+
+function renderGroupList() {
+  const active = getActiveGroupEntries();
+  const archived = getArchivedGroupEntries();
+  const listEl = dom.groupList;
+  listEl.innerHTML = '';
+
+  if (active.length === 0) {
+    listEl.innerHTML = '<div class="group-empty-state"><p>グループがありません</p><p class="group-empty-sub">新しいグループを作成しましょう</p></div>';
+  } else {
+    active.forEach((g, i) => listEl.appendChild(createGroupCard(g, i, false)));
+  }
+
+  if (archived.length > 0) {
+    dom.archivedSection.classList.remove('hidden');
+    dom.archivedList.innerHTML = '';
+    archived.forEach((g, i) => dom.archivedList.appendChild(createGroupCard(g, i, true)));
+  } else {
+    dom.archivedSection.classList.add('hidden');
+  }
+
+  dom.addGroupBtn.disabled = !canCreateGroup();
+  dom.homeLimitText.textContent = canCreateGroup()
+    ? `${active.length} / 3 グループ`
+    : 'グループは最大3つまでです';
+}
+
+function createGroupCard(g, index, isArchived) {
+  const card = document.createElement('div');
+  card.className = 'group-card' + (isArchived ? ' group-card-archived' : '');
+  card.style.setProperty('--item-i', index);
+
+  const syncTag = g.isLocal ? '' : '<span class="group-card-sync">同期</span>';
+  const archBadge = isArchived ? '<span class="group-card-badge">アーカイブ</span>' : '';
+
+  card.innerHTML = `
+    <div class="group-card-body">
+      <h3 class="group-card-name">${escapeHtml(g.name)}</h3>
+      <p class="group-card-members">${escapeHtml(g.members || '')} ${syncTag} ${archBadge}</p>
+    </div>
+    <button class="group-card-action btn-icon" title="操作">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+    </button>
+  `;
+
+  card.querySelector('.group-card-body').addEventListener('click', () => enterGroup(g));
+  card.querySelector('.group-card-action').addEventListener('click', (e) => {
+    e.stopPropagation();
+    openGroupAction(g);
+  });
+
+  return card;
+}
+
+function openGroupAction(g) {
+  actionGroup = g;
+  dom.groupActionName.textContent = g.name;
+  dom.actionArchiveLabel.textContent = g.archived ? 'アーカイブ解除' : 'アーカイブ';
+  showModal(dom.groupActionModal);
+}
+
+function doGroupRename() {
+  if (!actionGroup) return;
+  hideModal(dom.groupActionModal);
+  dom.renameInput.value = actionGroup.name;
+  showModal(dom.renameModal);
+}
+
+function doGroupArchiveToggle() {
+  if (!actionGroup) return;
+  if (actionGroup.archived) {
+    if (getActiveGroupEntries().length >= 3) {
+      showToast('アクティブなグループが上限（3つ）に達しています');
+      return;
+    }
+    unarchiveGroupEntry(actionGroup.code);
+    showToast('アーカイブを解除しました');
+  } else {
+    archiveGroupEntry(actionGroup.code);
+    showToast('アーカイブしました');
+  }
+  hideModal(dom.groupActionModal);
+  groups = loadGroupsList();
+  renderGroupList();
+  actionGroup = null;
+}
+
+function doGroupDelete() {
+  if (!actionGroup) return;
+  hideModal(dom.groupActionModal);
+  showConfirm(`「${actionGroup.name}」を削除しますか？\nこの操作は取り消せません。`, () => {
+    removeGroupEntry(actionGroup.code);
+    groups = loadGroupsList();
+    hideModal(dom.confirmDialog);
+    showToast('グループを削除しました');
+    renderGroupList();
+    actionGroup = null;
+  });
+}
+
+function doRenameConfirm() {
+  const newName = dom.renameInput.value.trim();
+  if (!newName) { showToast('グループ名を入力してください'); return; }
+  renameGroupEntry(actionGroup.code, newName);
+  if (activeGroup && activeGroup.code === actionGroup.code) {
+    activeGroup.name = newName;
+    dom.headerGroupName.textContent = newName;
+  }
+  hideModal(dom.renameModal);
+  groups = loadGroupsList();
+  renderGroupList();
+  showToast('名前を変更しました');
+  actionGroup = null;
+}
+
+// ==================== グループ入退出 ====================
+async function enterGroup(group) {
+  activeGroup = group;
+  currentTab = 'record';
+  trendCategoryFilter = 'all';
+
+  if (group.isLocal) {
+    roomCode = '';
+    appData = loadLocal(group.code);
+    dom.syncBadge.classList.add('hidden');
+  } else if (USE_FIREBASE && db) {
+    roomCode = group.code;
+    try {
+      const snap = await db.collection('rooms').doc(roomCode).get();
+      if (snap.exists && snap.data().users) {
+        appData.users = snap.data().users;
+      }
+    } catch {}
+    startListening();
+  }
+
+  const membersStr = `${appData.users.user1} & ${appData.users.user2}`;
+  updateGroupMembers(group.code, membersStr);
+
+  dom.headerGroupName.textContent = group.name;
+  showScreen(dom.mainScreen);
+  switchTab('record');
+  syncNames();
+  renderMonth();
+}
+
+function leaveGroup() {
+  stopListening();
+  activeGroup = null;
+  roomCode = '';
+  appData = { users: { user1: '', user2: '' }, expenses: [] };
+  groups = loadGroupsList();
+  showHomeScreen();
+}
+
+// ==================== localStorage 管理 ====================
+function saveLocal() {
+  if (!activeGroup || !activeGroup.isLocal) return;
+  try { localStorage.setItem('warikan-local-' + activeGroup.code, JSON.stringify(appData)); } catch {}
+}
+
+function loadLocal(code) {
   try {
-    const raw = localStorage.getItem(LOCAL_KEY);
+    const raw = localStorage.getItem('warikan-local-' + code);
     if (raw) return JSON.parse(raw);
   } catch {}
   return { users: { user1: '', user2: '' }, expenses: [] };
@@ -226,7 +459,7 @@ async function createRoom(user1, user2) {
   const code = generateRoomCode();
   const ref = db.collection('rooms').doc(code);
   const existing = await ref.get();
-  if (existing.exists) return createRoom(user1, user2); // 衝突時リトライ
+  if (existing.exists) return createRoom(user1, user2);
 
   await ref.set({
     users: { user1, user2 },
@@ -234,7 +467,6 @@ async function createRoom(user1, user2) {
   });
 
   roomCode = code;
-  localStorage.setItem(ROOM_KEY, code);
   appData.users = { user1, user2 };
   return code;
 }
@@ -242,10 +474,9 @@ async function createRoom(user1, user2) {
 async function joinRoom(code) {
   const upperCode = code.toUpperCase().trim();
   const snap = await db.collection('rooms').doc(upperCode).get();
-  if (!snap.exists) throw new Error('この合言葉の帳簿は見つかりません');
+  if (!snap.exists) throw new Error('この合言葉のグループは見つかりません');
 
   roomCode = upperCode;
-  localStorage.setItem(ROOM_KEY, upperCode);
   appData.users = snap.data().users;
   return upperCode;
 }
@@ -253,21 +484,22 @@ async function joinRoom(code) {
 function startListening() {
   if (!db || !roomCode) return;
 
-  // 既存リスナーを停止
   if (unsubRoom) unsubRoom();
   if (unsubExpenses) unsubExpenses();
 
-  // ルーム情報（名前の変更など）をリッスン
   unsubRoom = db.collection('rooms').doc(roomCode)
     .onSnapshot(snap => {
       if (snap.exists && snap.data().users) {
         appData.users = snap.data().users;
         syncNames();
         renderSummary();
+        if (activeGroup) {
+          const m = `${appData.users.user1} & ${appData.users.user2}`;
+          updateGroupMembers(activeGroup.code, m);
+        }
       }
     }, err => console.warn('Room listener error:', err));
 
-  // 支出をリアルタイムでリッスン
   unsubExpenses = db.collection('rooms').doc(roomCode)
     .collection('expenses')
     .onSnapshot(snap => {
@@ -275,7 +507,6 @@ function startListening() {
       renderMonth();
     }, err => console.warn('Expenses listener error:', err));
 
-  // 同期バッジ表示
   dom.syncBadge.classList.remove('hidden');
 }
 
@@ -285,52 +516,54 @@ function stopListening() {
   dom.syncBadge.classList.add('hidden');
 }
 
+// ==================== マイグレーション ====================
+function migrateOldData() {
+  const existing = loadGroupsList();
+  if (existing.length > 0) return;
+
+  const oldCode = localStorage.getItem(ROOM_KEY);
+  const oldData = localStorage.getItem(LOCAL_KEY);
+
+  if (oldCode && USE_FIREBASE) {
+    groups = [{ code: oldCode, name: '割り勘帳', archived: false, isLocal: false, members: '' }];
+    saveGroupsList();
+    localStorage.removeItem(ROOM_KEY);
+  } else if (oldData) {
+    try {
+      const parsed = JSON.parse(oldData);
+      const localCode = 'L' + uid();
+      const name = (parsed.users && parsed.users.user1 && parsed.users.user2)
+        ? `${parsed.users.user1} & ${parsed.users.user2}`
+        : '割り勘帳';
+      localStorage.setItem('warikan-local-' + localCode, oldData);
+      groups = [{ code: localCode, name, archived: false, isLocal: true, members: name }];
+      saveGroupsList();
+    } catch {}
+    localStorage.removeItem(LOCAL_KEY);
+  }
+}
+
 // ==================== 初期化 ====================
 async function initApp() {
   buildCategoryGrid();
+  migrateOldData();
+  groups = loadGroupsList();
 
-  if (USE_FIREBASE && db) {
-    // Firebase モード
-    if (roomCode) {
-      // 既にルームに接続済み → メイン画面へ
-      showSetupStep(dom.stepLoading);
-      try {
-        const snap = await db.collection('rooms').doc(roomCode).get();
-        if (snap.exists && snap.data().users) {
-          appData.users = snap.data().users;
-          startListening();
-          showScreen(dom.mainScreen);
-          syncNames();
-          renderMonth();
-        } else {
-          // ルームが存在しない → セットアップへ
-          roomCode = '';
-          localStorage.removeItem(ROOM_KEY);
-          showScreen(dom.setupScreen);
-          showSetupStep(dom.stepChoice);
-        }
-      } catch {
-        // オフライン時: Firestoreのキャッシュから読む
-        startListening();
-        showScreen(dom.mainScreen);
-        syncNames();
-        renderMonth();
-      }
-    } else {
-      showScreen(dom.setupScreen);
+  const active = getActiveGroupEntries();
+
+  if (active.length === 0) {
+    showScreen(dom.setupScreen);
+    dom.btnSetupBack.classList.add('hidden');
+    dom.btnSetupBackLocal.classList.add('hidden');
+    if (USE_FIREBASE && db) {
       showSetupStep(dom.stepChoice);
-    }
-  } else {
-    // localStorage モード
-    appData = loadLocal();
-    if (appData.users.user1 && appData.users.user2) {
-      showScreen(dom.mainScreen);
-      syncNames();
-      renderMonth();
     } else {
-      showScreen(dom.setupScreen);
       showSetupStep(dom.stepLocal);
     }
+  } else if (active.length === 1) {
+    await enterGroup(active[0]);
+  } else {
+    showHomeScreen();
   }
 }
 
@@ -563,12 +796,10 @@ function getTrendData() {
   for (let i = 5; i >= 0; i--) {
     months.push(shiftMonth(currentMonth, -i));
   }
-
   return months.map(m => {
     const mExps = appData.expenses.filter(e => e.date && e.date.startsWith(m));
     let total = 0;
     const catTotals = {};
-
     mExps.forEach(e => {
       const catId = e.category || 'other';
       const matchFilter = trendCategoryFilter === 'all' || catId === trendCategoryFilter;
@@ -577,7 +808,6 @@ function getTrendData() {
         catTotals[catId] = (catTotals[catId] || 0) + e.amount;
       }
     });
-
     const [, mm] = m.split('-');
     return { month: m, label: parseInt(mm) + '月', total, catTotals };
   });
@@ -587,18 +817,14 @@ function renderTrendChart() {
   const container = $('trend-chart');
   const data = getTrendData();
   const maxTotal = Math.max(...data.map(d => d.total), 1);
-
   container.innerHTML = '';
   data.forEach((d, i) => {
     const col = document.createElement('div');
     col.className = 'trend-col';
-
     const barWrap = document.createElement('div');
     barWrap.className = 'trend-bar-wrap';
-
     if (d.total > 0) {
       const heightPct = (d.total / maxTotal * 100);
-
       if (trendCategoryFilter === 'all') {
         const sorted = Object.entries(d.catTotals).sort((a, b) => b[1] - a[1]);
         sorted.forEach(([catId, amt]) => {
@@ -617,21 +843,17 @@ function renderTrendChart() {
         seg.style.background = cat.color;
         barWrap.appendChild(seg);
       }
-
       const amtLabel = document.createElement('span');
       amtLabel.className = 'trend-bar-amount';
       amtLabel.textContent = d.total >= 10000 ? Math.round(d.total / 10000) + '万' : yen(d.total);
       col.appendChild(amtLabel);
     }
-
     col.appendChild(barWrap);
-
     const label = document.createElement('span');
     label.className = 'trend-label';
     label.textContent = d.label;
     if (d.month === currentMonth) label.classList.add('trend-label-current');
     col.appendChild(label);
-
     col.style.setProperty('--bar-i', i);
     container.appendChild(col);
   });
@@ -764,9 +986,7 @@ async function saveExpense() {
       } else {
         await db.collection('rooms').doc(roomCode).collection('expenses').add(data);
       }
-      // onSnapshot が renderMonth() を自動で呼ぶ
     } else {
-      // localStorage モード
       if (editingExpenseId) {
         const idx = appData.expenses.findIndex(e => e.id === editingExpenseId);
         if (idx >= 0) appData.expenses[idx] = { id: editingExpenseId, ...data };
@@ -837,6 +1057,7 @@ function showConfirm(msg, onOk) {
 
 // ==================== 設定 ====================
 function openSettings() {
+  dom.settingsGroupName.value = activeGroup ? activeGroup.name : '';
   dom.settingsUser1.value = appData.users.user1;
   dom.settingsUser2.value = appData.users.user2;
   if (USE_FIREBASE && roomCode) {
@@ -849,6 +1070,7 @@ function openSettings() {
 }
 
 async function saveSettings() {
+  const groupName = dom.settingsGroupName.value.trim();
   const u1 = dom.settingsUser1.value.trim();
   const u2 = dom.settingsUser2.value.trim();
   if (!u1 || !u2) { showToast('名前を入力してください'); return; }
@@ -858,13 +1080,22 @@ async function saveSettings() {
       await db.collection('rooms').doc(roomCode).update({
         users: { user1: u1, user2: u2 }
       });
-      // onSnapshot が syncNames() を自動で呼ぶ
     } else {
       appData.users = { user1: u1, user2: u2 };
       saveLocal();
       syncNames();
       renderMonth();
     }
+
+    if (activeGroup && groupName) {
+      renameGroupEntry(activeGroup.code, groupName);
+      activeGroup.name = groupName;
+      dom.headerGroupName.textContent = groupName;
+    }
+    if (activeGroup) {
+      updateGroupMembers(activeGroup.code, `${u1} & ${u2}`);
+    }
+
     hideModal(dom.settingsModal);
     showToast('設定を保存しました');
   } catch (e) {
@@ -885,19 +1116,30 @@ function exportData() {
 }
 
 function resetRoom() {
-  showConfirm('この帳簿から退出しますか？\nデータはサーバーに残ります。', () => {
+  showConfirm('このグループから退出しますか？\nローカルデータは削除されます。', () => {
     stopListening();
+    if (activeGroup) {
+      removeGroupEntry(activeGroup.code);
+      groups = loadGroupsList();
+    }
     roomCode = '';
-    localStorage.removeItem(ROOM_KEY);
-    localStorage.removeItem(LOCAL_KEY);
+    activeGroup = null;
     appData = { users: { user1: '', user2: '' }, expenses: [] };
     hideModal(dom.confirmDialog);
     hideModal(dom.settingsModal);
-    showScreen(dom.setupScreen);
-    if (USE_FIREBASE) {
-      showSetupStep(dom.stepChoice);
+
+    const active = getActiveGroupEntries();
+    if (active.length === 0) {
+      showScreen(dom.setupScreen);
+      dom.btnSetupBack.classList.add('hidden');
+      dom.btnSetupBackLocal.classList.add('hidden');
+      if (USE_FIREBASE && db) {
+        showSetupStep(dom.stepChoice);
+      } else {
+        showSetupStep(dom.stepLocal);
+      }
     } else {
-      showSetupStep(dom.stepLocal);
+      showHomeScreen();
     }
     showToast('退出しました');
   });
@@ -905,20 +1147,55 @@ function resetRoom() {
 
 // ==================== イベントリスナー ====================
 function setupEvents() {
+  // === ホーム ===
+  dom.addGroupBtn.addEventListener('click', () => {
+    if (!canCreateGroup()) { showToast('グループは最大3つまでです'); return; }
+    showScreen(dom.setupScreen);
+    dom.btnSetupBack.classList.remove('hidden');
+    dom.btnSetupBackLocal.classList.remove('hidden');
+    if (USE_FIREBASE && db) {
+      showSetupStep(dom.stepChoice);
+    } else {
+      showSetupStep(dom.stepLocal);
+    }
+    dom.groupNameInput.value = '';
+    dom.user1Name.value = '';
+    dom.user2Name.value = '';
+    dom.localGroupName.value = '';
+    dom.localUser1.value = '';
+    dom.localUser2.value = '';
+    dom.joinGroupName.value = '';
+    dom.joinCodeInput.value = '';
+  });
+
+  dom.toggleArchived.addEventListener('click', () => {
+    archivedExpanded = !archivedExpanded;
+    dom.archivedList.classList.toggle('hidden', !archivedExpanded);
+    dom.archivedToggleIcon.style.transform = archivedExpanded ? 'rotate(180deg)' : '';
+  });
+
+  dom.backToHome.addEventListener('click', leaveGroup);
+
   // === セットアップ: Firebase モード ===
   $('btn-to-create').addEventListener('click', () => showSetupStep(dom.stepCreate));
   $('btn-to-join').addEventListener('click', () => showSetupStep(dom.stepJoin));
   $('btn-back-create').addEventListener('click', () => showSetupStep(dom.stepChoice));
   $('btn-back-join').addEventListener('click', () => showSetupStep(dom.stepChoice));
 
-  // 帳簿をつくる
+  dom.btnSetupBack.addEventListener('click', () => showHomeScreen());
+  dom.btnSetupBackLocal.addEventListener('click', () => showHomeScreen());
+
+  // グループをつくる
   $('btn-create-room').addEventListener('click', async () => {
+    const groupName = dom.groupNameInput.value.trim() || '割り勘帳';
     const u1 = dom.user1Name.value.trim();
     const u2 = dom.user2Name.value.trim();
     if (!u1 || !u2) { showToast('ふたりの名前を入力してください'); return; }
     showSetupStep(dom.stepLoading);
     try {
       const code = await createRoom(u1, u2);
+      addGroupEntry(code, groupName, false, `${u1} & ${u2}`);
+      groups = loadGroupsList();
       dom.displayCode.textContent = code;
       showSetupStep(dom.stepCode);
     } catch (e) {
@@ -934,24 +1211,25 @@ function setupEvents() {
 
   // はじめる
   $('btn-start').addEventListener('click', () => {
-    startListening();
-    showScreen(dom.mainScreen);
-    syncNames();
-    renderMonth();
+    const group = groups.find(g => g.code === roomCode);
+    if (group) enterGroup(group);
   });
 
-  // 帳簿に参加する
+  // グループに参加する
   $('btn-join-room').addEventListener('click', async () => {
     const code = dom.joinCodeInput.value.trim();
+    const groupName = dom.joinGroupName.value.trim();
     if (!code || code.length < 4) { showToast('合言葉を入力してください'); return; }
     showSetupStep(dom.stepLoading);
     try {
-      await joinRoom(code);
-      startListening();
-      showScreen(dom.mainScreen);
-      syncNames();
-      renderMonth();
-      showToast('帳簿に参加しました！');
+      const joinedCode = await joinRoom(code);
+      const name = groupName || `${appData.users.user1} & ${appData.users.user2}`;
+      const members = `${appData.users.user1} & ${appData.users.user2}`;
+      addGroupEntry(joinedCode, name, false, members);
+      groups = loadGroupsList();
+      const group = groups.find(g => g.code === joinedCode);
+      if (group) enterGroup(group);
+      showToast('グループに参加しました！');
     } catch (e) {
       console.error(e);
       showToast(e.message || '参加に失敗しました');
@@ -959,21 +1237,23 @@ function setupEvents() {
     }
   });
 
-  // 合言葉入力を自動大文字化
   dom.joinCodeInput.addEventListener('input', () => {
     dom.joinCodeInput.value = dom.joinCodeInput.value.toUpperCase();
   });
 
   // === セットアップ: ローカルモード ===
   $('local-start-btn').addEventListener('click', () => {
+    const groupName = dom.localGroupName.value.trim() || '割り勘帳';
     const u1 = dom.localUser1.value.trim();
     const u2 = dom.localUser2.value.trim();
     if (!u1 || !u2) { showToast('ふたりの名前を入力してください'); return; }
-    appData.users = { user1: u1, user2: u2 };
-    saveLocal();
-    showScreen(dom.mainScreen);
-    syncNames();
-    renderMonth();
+    const localCode = 'L' + uid();
+    appData = { users: { user1: u1, user2: u2 }, expenses: [] };
+    localStorage.setItem('warikan-local-' + localCode, JSON.stringify(appData));
+    addGroupEntry(localCode, groupName, true, `${u1} & ${u2}`);
+    groups = loadGroupsList();
+    const group = groups.find(g => g.code === localCode);
+    if (group) enterGroup(group);
   });
 
   // === タブ ===
@@ -992,7 +1272,6 @@ function setupEvents() {
   dom.expenseForm.addEventListener('submit', e => { e.preventDefault(); saveExpense(); });
   dom.deleteExpenseBtn.addEventListener('click', deleteExpense);
 
-  // 分割タイプ
   document.querySelectorAll('input[name="split-type"]').forEach(r =>
     r.addEventListener('change', updateSplitVis)
   );
@@ -1013,6 +1292,18 @@ function setupEvents() {
   dom.exportBtn.addEventListener('click', exportData);
   dom.resetBtn.addEventListener('click', resetRoom);
 
+  // === グループ操作 ===
+  dom.groupActionClose.addEventListener('click', () => hideModal(dom.groupActionModal));
+  dom.groupActionModal.querySelector('.modal-overlay').addEventListener('click', () => hideModal(dom.groupActionModal));
+  dom.actionRename.addEventListener('click', doGroupRename);
+  dom.actionArchive.addEventListener('click', doGroupArchiveToggle);
+  dom.actionDelete.addEventListener('click', doGroupDelete);
+
+  // === リネーム ===
+  dom.renameCancel.addEventListener('click', () => hideModal(dom.renameModal));
+  dom.renameModal.querySelector('.modal-overlay').addEventListener('click', () => hideModal(dom.renameModal));
+  dom.renameOk.addEventListener('click', doRenameConfirm);
+
   // === 確認 ===
   dom.confirmCancel.addEventListener('click', () => { hideModal(dom.confirmDialog); confirmCb = null; });
   dom.confirmOk.addEventListener('click', () => { hideModal(dom.confirmDialog); if (confirmCb) { confirmCb(); confirmCb = null; } });
@@ -1022,6 +1313,8 @@ function setupEvents() {
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       if (!dom.confirmDialog.classList.contains('hidden')) { hideModal(dom.confirmDialog); confirmCb = null; }
+      else if (!dom.renameModal.classList.contains('hidden')) hideModal(dom.renameModal);
+      else if (!dom.groupActionModal.classList.contains('hidden')) hideModal(dom.groupActionModal);
       else if (!dom.expenseModal.classList.contains('hidden')) hideModal(dom.expenseModal);
       else if (!dom.settingsModal.classList.contains('hidden')) hideModal(dom.settingsModal);
     }

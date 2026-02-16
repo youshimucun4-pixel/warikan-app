@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>ふたりの割り勘帳</title>
+  <title>割り勘帳</title>
 
   <!-- PWA -->
   <link rel="manifest" href="manifest.json">
@@ -19,7 +19,7 @@
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Shippori+Mincho+B1:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
 
   <!-- Firebase SDK (compat) -->
@@ -29,25 +29,49 @@
 <body>
   <div id="app">
 
+    <!-- ====== ホーム画面（グループ一覧） ====== -->
+    <div id="home-screen" class="screen hidden">
+      <div class="home-container">
+        <div class="home-brand">
+          <div class="setup-stamp">割</div>
+          <h1 class="home-title">割り勘帳</h1>
+        </div>
+        <div id="group-list" class="group-list"></div>
+        <div id="archived-section" class="archived-section hidden">
+          <button id="toggle-archived" class="archived-toggle-btn">
+            <span id="archived-toggle-icon" class="toggle-arrow">▾</span> アーカイブ
+          </button>
+          <div id="archived-list" class="group-list"></div>
+        </div>
+        <button id="add-group-btn" class="btn btn-warm btn-block home-add-btn">＋ 新しいグループ</button>
+        <p class="home-limit-text" id="home-limit-text"></p>
+      </div>
+    </div>
+
     <!-- ====== 初期設定画面 ====== -->
-    <div id="setup-screen" class="screen">
+    <div id="setup-screen" class="screen hidden">
       <div class="setup-container">
         <div class="setup-stamp">割</div>
-        <h1 class="setup-title">ふたりの<br>割り勘帳</h1>
+        <h1 class="setup-title">割り勘帳</h1>
 
         <!-- ステップ: 選択 (Firebase モード) -->
         <div id="step-choice" class="setup-step hidden">
-          <p class="setup-desc">帳簿を作って<br>ふたりで共有しましょう</p>
+          <p class="setup-desc">グループを作って<br>共有しましょう</p>
           <div class="setup-form">
-            <button id="btn-to-create" class="btn btn-warm btn-block">新しい帳簿をつくる</button>
-            <button id="btn-to-join" class="btn btn-outline btn-block">帳簿に参加する</button>
+            <button id="btn-to-create" class="btn btn-warm btn-block">新しいグループをつくる</button>
+            <button id="btn-to-join" class="btn btn-outline btn-block">グループに参加する</button>
+            <button type="button" id="btn-setup-back" class="btn-link hidden">&larr; ホームに戻る</button>
           </div>
         </div>
 
-        <!-- ステップ: 名前入力 (帳簿作成) -->
+        <!-- ステップ: グループ作成 -->
         <div id="step-create" class="setup-step hidden">
-          <p class="setup-desc">ふたりの名前を登録してください</p>
+          <p class="setup-desc">グループの情報を入力してください</p>
           <div class="setup-form">
+            <div class="setup-field">
+              <input type="text" id="group-name-input" placeholder="グループ名（例：家計簿）" maxlength="20">
+            </div>
+            <div class="setup-divider"></div>
             <div class="setup-field">
               <input type="text" id="user1-name" placeholder="ひとりめの名前" maxlength="10">
             </div>
@@ -62,22 +86,25 @@
 
         <!-- ステップ: 合言葉表示 -->
         <div id="step-code" class="setup-step hidden">
-          <p class="setup-desc">帳簿ができました！</p>
+          <p class="setup-desc">グループができました！</p>
           <div class="setup-form">
             <div class="room-code-card">
               <span class="room-code-label">合言葉</span>
               <div class="room-code-value" id="display-code"></div>
               <button id="btn-copy-code" class="btn btn-outline btn-sm">コピー</button>
-              <p class="room-code-hint">この合言葉を相手に伝えてください<br>相手は「帳簿に参加する」から入力します</p>
+              <p class="room-code-hint">この合言葉を相手に伝えてください<br>相手は「グループに参加する」から入力します</p>
             </div>
             <button id="btn-start" class="btn btn-warm btn-block">はじめる</button>
           </div>
         </div>
 
-        <!-- ステップ: コード入力 (帳簿参加) -->
+        <!-- ステップ: コード入力 (参加) -->
         <div id="step-join" class="setup-step hidden">
           <p class="setup-desc">相手から聞いた<br>合言葉を入力してください</p>
           <div class="setup-form">
+            <div class="setup-field">
+              <input type="text" id="join-group-name" placeholder="グループ名（任意）" maxlength="20">
+            </div>
             <div class="setup-field">
               <input type="text" id="join-code-input" placeholder="合言葉（6文字）" maxlength="6" autocapitalize="characters" autocomplete="off" spellcheck="false">
             </div>
@@ -94,8 +121,12 @@
 
         <!-- ステップ: ローカルモード (Firebase未設定) -->
         <div id="step-local" class="setup-step hidden">
-          <p class="setup-desc">ふたりの名前を登録して<br>はじめましょう</p>
+          <p class="setup-desc">グループの情報を入力して<br>はじめましょう</p>
           <div class="setup-form">
+            <div class="setup-field">
+              <input type="text" id="local-group-name" placeholder="グループ名（例：家計簿）" maxlength="20">
+            </div>
+            <div class="setup-divider"></div>
             <div class="setup-field">
               <input type="text" id="local-user1" placeholder="ひとりめの名前" maxlength="10">
             </div>
@@ -104,6 +135,7 @@
               <input type="text" id="local-user2" placeholder="ふたりめの名前" maxlength="10">
             </div>
             <button id="local-start-btn" class="btn btn-warm btn-block">はじめる</button>
+            <button type="button" id="btn-setup-back-local" class="btn-link hidden">&larr; ホームに戻る</button>
             <p class="setup-hint">※ オフラインモード（同期なし）</p>
           </div>
         </div>
@@ -115,7 +147,10 @@
 
       <!-- ヘッダー -->
       <header class="header anim-in" style="--delay:0">
-        <h1 class="header-title">割り勘帳</h1>
+        <button id="back-to-home" class="btn-icon" title="ホーム">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <h1 class="header-title" id="header-group-name">割り勘帳</h1>
         <div class="header-right">
           <span id="sync-badge" class="sync-badge hidden">同期中</span>
           <button id="settings-btn" class="btn-icon" title="設定">
@@ -130,7 +165,7 @@
         <button class="tab-btn" data-tab="analytics">分析</button>
       </div>
 
-      <!-- 月ナビゲーション (共通) -->
+      <!-- 月ナビゲーション -->
       <nav class="month-nav anim-in" style="--delay:2">
         <button id="prev-month" class="btn-icon" title="前月">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
@@ -190,7 +225,6 @@
 
       <!-- ====== 分析パネル ====== -->
       <div id="panel-analytics" class="panel hidden">
-        <!-- ドーナツチャート -->
         <section class="chart-card">
           <h3 class="chart-title">カテゴリ別支出</h3>
           <div class="donut-wrap">
@@ -208,7 +242,6 @@
           </div>
         </section>
 
-        <!-- 月別推移 -->
         <section class="chart-card">
           <h3 class="chart-title">月別推移（6ヶ月）</h3>
           <div class="trend-filters" id="trend-filters"></div>
@@ -311,14 +344,17 @@
           </button>
         </div>
         <div class="modal-body">
-          <!-- 合言葉コード (Firebase時のみ表示) -->
           <div id="settings-room-section" class="form-group hidden">
             <label>合言葉コード</label>
             <div class="room-code-inline">
               <span id="settings-room-code" class="room-code-mono"></span>
               <button type="button" id="settings-copy-code" class="btn-copy">コピー</button>
             </div>
-            <p class="room-code-hint-sm">この合言葉で相手と帳簿を共有できます</p>
+            <p class="room-code-hint-sm">この合言葉で相手とグループを共有できます</p>
+          </div>
+          <div class="form-group">
+            <label for="settings-group-name">グループ名</label>
+            <input type="text" id="settings-group-name" maxlength="20">
           </div>
           <div class="form-group">
             <label for="settings-user1">ひとりめの名前</label>
@@ -334,8 +370,50 @@
           <div class="settings-extra">
             <h4>データ管理</h4>
             <button id="export-btn" class="btn btn-outline">エクスポート</button>
-            <button id="reset-btn" class="btn btn-ghost-danger">帳簿から退出する</button>
+            <button id="reset-btn" class="btn btn-ghost-danger">グループから退出する</button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== グループ操作モーダル ====== -->
+    <div id="group-action-modal" class="modal hidden">
+      <div class="modal-overlay"></div>
+      <div class="modal-sheet group-action-sheet">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <h2 id="group-action-name">グループ操作</h2>
+          <button id="group-action-close" class="btn-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="group-action-list">
+            <button id="action-rename" class="group-action-item">
+              <span class="ga-icon">✏️</span><span>名前を変更</span>
+            </button>
+            <button id="action-archive" class="group-action-item">
+              <span class="ga-icon">📦</span><span id="action-archive-label">アーカイブ</span>
+            </button>
+            <button id="action-delete" class="group-action-item group-action-danger">
+              <span class="ga-icon">🗑️</span><span>削除する</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== リネームモーダル ====== -->
+    <div id="rename-modal" class="modal hidden">
+      <div class="modal-overlay"></div>
+      <div class="modal-dialog">
+        <p class="rename-title">グループ名を変更</p>
+        <div class="form-group rename-field">
+          <input type="text" id="rename-input" maxlength="20" placeholder="新しいグループ名">
+        </div>
+        <div class="dialog-actions">
+          <button id="rename-cancel" class="btn btn-outline">キャンセル</button>
+          <button id="rename-ok" class="btn btn-warm">変更</button>
         </div>
       </div>
     </div>

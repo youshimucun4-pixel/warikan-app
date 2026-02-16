@@ -1,7 +1,7 @@
 {
-  "name": "ふたりの割り勘帳",
+  "name": "割り勘帳",
   "short_name": "割り勘帳",
-  "description": "同棲ふたりの割り勘を記録・計算するアプリ",
+  "description": "割り勘・建て替え・家計簿を簡単に管理するアプリ",
   "start_url": "./",
   "display": "standalone",
   "orientation": "portrait",
