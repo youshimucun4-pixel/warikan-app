@@ -1520,10 +1520,11 @@ body {
    ============================================ */
 .home-container {
   min-height: 100vh;
-  padding: 32px 20px 40px;
+  padding: 32px 20px 48px;
   max-width: 540px;
   margin: 0 auto;
   animation: fadeSlideUp .5s cubic-bezier(.22,1,.36,1) both;
+  overflow-y: auto;
 }
 
 .home-brand {
@@ -1531,6 +1532,11 @@ body {
   flex-direction: column;
   align-items: center;
   margin-bottom: 28px;
+}
+
+/* オンボーディング表示時は上部のブランド（割アイコン+タイトル）を非表示にして二重表示を防ぐ */
+.home-container:has(#onboarding:not(.hidden)) .home-brand {
+  display: none !important;
 }
 
 .home-title {
@@ -1763,14 +1769,24 @@ body {
    ============================================ */
 .onboarding {
   text-align: center;
-  padding: 20px 0;
+  padding: 24px 0 32px;
   animation: fadeSlideUp .7s cubic-bezier(.22,1,.36,1) both;
 }
+
+.onboarding-app-name {
+  font-family: var(--ff-serif);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  color: var(--ink-light);
+  margin-bottom: 20px;
+}
+
 .onboarding-illustration {
   position: relative;
   width: 120px;
   height: 120px;
-  margin: 0 auto 24px;
+  margin: 0 auto 20px;
 }
 .onboard-stamp {
   width: 80px;
@@ -1805,26 +1821,26 @@ body {
   font-weight: 700;
   color: var(--ink);
   letter-spacing: 2px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 .onboarding-subtitle {
   font-size: 14px;
   color: var(--ink-light);
-  margin-bottom: 32px;
+  margin-bottom: 24px;
   line-height: 1.7;
 }
 .onboarding-steps {
   text-align: left;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  margin-bottom: 32px;
+  gap: 12px;
+  margin-bottom: 24px;
 }
 .onboard-step {
   display: flex;
   gap: 14px;
   align-items: flex-start;
-  padding: 14px;
+  padding: 12px 14px;
   background: var(--paper);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
@@ -1852,6 +1868,12 @@ body {
   font-size: 12px;
   color: var(--ink-light);
   margin-top: 2px;
+}
+
+#onboard-start-btn {
+  margin-top: 8px;
+  padding: 14px 24px;
+  font-size: 15px;
 }
 
 /* Scrollbar */
