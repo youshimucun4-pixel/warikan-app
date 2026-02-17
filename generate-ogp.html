@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>OGP画像生成</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #eee; }
+    canvas { border: 1px solid #ccc; display: block; margin: 20px 0; }
+    button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>OGP画像生成 (1200x630)</h1>
+  <canvas id="c" width="1200" height="630"></canvas>
+  <button onclick="download()">PNGをダウンロード</button>
+
+  <script>
+    const c = document.getElementById('c');
+    const ctx = c.getContext('2d');
+    const W = 1200, H = 630;
+
+    // 背景
+    ctx.fillStyle = '#F5F0E8';
+    ctx.fillRect(0, 0, W, H);
+
+    // 上下の装飾ライン
+    ctx.strokeStyle = '#DDD7CD';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(60, 40); ctx.lineTo(W - 60, 40); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(60, H - 40); ctx.lineTo(W - 60, H - 40); ctx.stroke();
+
+    // 判子（中央やや左）
+    const stampX = 380, stampY = H / 2;
+    const stampR = 90;
+
+    // 外円（薄い）
+    ctx.strokeStyle = 'rgba(198,93,62,0.3)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(stampX, stampY, stampR + 12, 0, Math.PI * 2); ctx.stroke();
+
+    // 本円
+    ctx.strokeStyle = '#C65D3E';
+    ctx.lineWidth = 4.5;
+    ctx.beginPath(); ctx.arc(stampX, stampY, stampR, 0, Math.PI * 2); ctx.stroke();
+
+    // 「割」
+    ctx.fillStyle = '#C65D3E';
+    ctx.font = '700 82px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('割', stampX, stampY + 3);
+
+    // アプリ名
+    ctx.fillStyle = '#2C2416';
+    ctx.font = '700 52px serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('割り勘帳', 530, H / 2 - 40);
+
+    // サブテキスト
+    ctx.fillStyle = '#5C5347';
+    ctx.font = '400 22px sans-serif';
+    ctx.fillText('ふたりの割り勘・建て替えを', 530, H / 2 + 20);
+    ctx.fillText('かんたん管理', 530, H / 2 + 52);
+
+    // カテゴリドット（装飾）
+    const colors = ['#4A7FB5', '#D4854A', '#8B6F4E', '#7B8F5E', '#4A8B5E', '#C6993E', '#8B8580'];
+    colors.forEach((color, i) => {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(535 + i * 28, H / 2 + 90, 6, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    function download() {
+      const a = document.createElement('a');
+      a.download = 'ogp.png';
+      a.href = c.toDataURL('image/png');
+      a.click();
+    }
+  </script>
+</body>
+</html>
