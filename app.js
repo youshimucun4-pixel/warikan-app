@@ -1012,7 +1012,7 @@ function updateAuthUI() {
   if (currentAuthUser) {
     guest.classList.add('hidden');
     userBlock.classList.remove('hidden');
-    if (emailEl) emailEl.textContent = currentAuthUser.email || '';
+    if (emailEl) emailEl.textContent = currentAuthUser.displayName ? `${currentAuthUser.displayName} (${currentAuthUser.email || ''})` : (currentAuthUser.email || '');
   } else {
     guest.classList.remove('hidden');
     userBlock.classList.add('hidden');
@@ -1095,12 +1095,37 @@ async function authFormSubmit(e) {
   } catch (err) {
     const code = err.code || '';
     let msg = err.message || 'エラーが発生しました';
-    if (code === 'auth/email-already-in-use') msg = 'このメールアドレスは既に登録されています';
+    if (code === 'auth/configuration-not-found') msg = '認証の設定が有効になっていません。Firebase コンソールの「Authentication」→「Sign-in method」で「メール/パスワード」を有効にしてください。';
+    else if (code === 'auth/email-already-in-use') msg = 'このメールアドレスは既に登録されています';
     else if (code === 'auth/invalid-email') msg = '有効なメールアドレスを入力してください';
     else if (code === 'auth/weak-password') msg = 'パスワードは6文字以上にしてください';
     else if (code === 'auth/user-not-found' || code === 'auth/wrong-password') msg = 'メールアドレスまたはパスワードが違います';
     errGeneral.textContent = msg;
     errGeneral.classList.remove('hidden');
+  }
+}
+
+async function signInWithGoogle() {
+  if (!auth) {
+    showToast('認証機能が利用できません', { type: 'error' });
+    return;
+  }
+  const provider = new firebase.auth.GoogleAuthProvider();
+  try {
+    await auth.signInWithPopup(provider);
+    showToast('ログインしました', { type: 'success' });
+    closeAuthModal();
+  } catch (err) {
+    const code = err.code || '';
+    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+      return; // ユーザーが閉じただけなら何もしない
+    }
+    if (code === 'auth/popup-blocked') {
+      showToast('ポップアップがブロックされました。ブラウザでポップアップを許可してください。', { type: 'error' });
+      return;
+    }
+    console.error('Google sign-in error:', err);
+    showToast(err.message || 'Googleログインに失敗しました', { type: 'error' });
   }
 }
 
@@ -1382,8 +1407,10 @@ function setupEvents() {
   // === アカウント（認証） ===
   if ($('btn-open-signup')) $('btn-open-signup').addEventListener('click', () => openAuthModal('signup'));
   if ($('btn-open-login')) $('btn-open-login').addEventListener('click', () => openAuthModal('login'));
+  if ($('start-google-btn')) $('start-google-btn').addEventListener('click', signInWithGoogle);
   if ($('start-signup-btn')) $('start-signup-btn').addEventListener('click', () => openAuthModal('signup'));
   if ($('start-login-btn')) $('start-login-btn').addEventListener('click', () => openAuthModal('login'));
+  if ($('btn-google-login')) $('btn-google-login').addEventListener('click', signInWithGoogle);
   if ($('btn-logout')) $('btn-logout').addEventListener('click', logout);
   if ($('auth-modal')) {
     if ($('auth-modal-close')) $('auth-modal-close').addEventListener('click', closeAuthModal);

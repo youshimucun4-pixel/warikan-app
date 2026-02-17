@@ -214,6 +214,23 @@ body {
 }
 .btn-outline:hover { background: var(--cream-deep); }
 
+.btn-google {
+  background: #fff;
+  border: 1.5px solid var(--border-strong);
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.btn-google:hover {
+  background: var(--cream);
+  border-color: #dadce0;
+}
+.btn-google-icon {
+  flex-shrink: 0;
+}
+
 .btn-ghost-danger {
   background: transparent;
   color: #C0392B;
