@@ -836,6 +836,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  overflow: hidden;
 }
 
 .modal-dialog {
@@ -866,6 +867,10 @@ body {
 /* ============================================
    FORMS
    ============================================ */
+.form-group {
+  min-width: 0;
+  overflow: hidden;
+}
 .form-group > label {
   display: block;
   font-size: 12px;
@@ -879,6 +884,7 @@ body {
 .form-group input[type="number"],
 .form-group input[type="date"] {
   width: 100%;
+  max-width: 100%;
   padding: 11px 14px;
   border: 1.5px solid var(--border);
   border-radius: var(--radius-sm);
@@ -887,6 +893,7 @@ body {
   background: var(--cream);
   color: var(--ink);
   transition: all var(--transition);
+  box-sizing: border-box;
 }
 .form-group input:focus {
   outline: none;
