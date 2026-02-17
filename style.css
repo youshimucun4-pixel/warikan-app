@@ -1573,6 +1573,53 @@ body {
 }
 
 /* ============================================
+   START SCREEN（最初にアカウント登録から）
+   ============================================ */
+.start-container {
+  min-height: 100vh;
+  padding: 48px 24px 40px;
+  max-width: 540px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  animation: fadeSlideUp .5s cubic-bezier(.22,1,.36,1) both;
+}
+
+.start-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 32px;
+}
+
+.start-title {
+  font-family: var(--ff-serif);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--ink);
+  margin-top: 16px;
+}
+
+.start-message {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink-mid);
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.start-actions {
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ============================================
    HOME SCREEN
    ============================================ */
 .home-container {

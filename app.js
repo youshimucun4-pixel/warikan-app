@@ -31,6 +31,12 @@ if (USE_FIREBASE) {
     auth.onAuthStateChanged(user => {
       currentAuthUser = user;
       updateAuthUI();
+      // ログイン済みならホーム画面へ、未ログインなら最初の画面（登録から）へ
+      if (user) {
+        showHomeScreen();
+      } else {
+        showStartScreen();
+      }
     });
   } catch (e) {
     console.error('Firebase init error:', e);
@@ -180,10 +186,16 @@ function getArchivedGroups() {
 
 // ==================== 画面遷移 ====================
 function showScreen(screenId) {
-  ['home-screen', 'setup-screen', 'main-screen'].forEach(id => {
-    $(id).classList.add('hidden');
+  ['start-screen', 'home-screen', 'setup-screen', 'main-screen'].forEach(id => {
+    const el = $(id);
+    if (el) el.classList.add('hidden');
   });
-  $(screenId).classList.remove('hidden');
+  const target = $(screenId);
+  if (target) target.classList.remove('hidden');
+}
+
+function showStartScreen() {
+  showScreen('start-screen');
 }
 
 function showSetupStep(stepId) {
@@ -257,7 +269,12 @@ function stopListening() {
 // ==================== 初期化 ====================
 async function initApp() {
   groups = loadGroups();
-  showHomeScreen();
+  // Firebase 認証がない環境ではそのままホームへ。ある場合は最初に登録画面を表示し、onAuthStateChanged でログイン済みならホームへ
+  if (!USE_FIREBASE || !auth) {
+    showHomeScreen();
+  } else {
+    showStartScreen();
+  }
 }
 
 // ==================== ホーム画面 ====================
@@ -1365,6 +1382,8 @@ function setupEvents() {
   // === アカウント（認証） ===
   if ($('btn-open-signup')) $('btn-open-signup').addEventListener('click', () => openAuthModal('signup'));
   if ($('btn-open-login')) $('btn-open-login').addEventListener('click', () => openAuthModal('login'));
+  if ($('start-signup-btn')) $('start-signup-btn').addEventListener('click', () => openAuthModal('signup'));
+  if ($('start-login-btn')) $('start-login-btn').addEventListener('click', () => openAuthModal('login'));
   if ($('btn-logout')) $('btn-logout').addEventListener('click', logout);
   if ($('auth-modal')) {
     if ($('auth-modal-close')) $('auth-modal-close').addEventListener('click', closeAuthModal);
