@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>プライバシーポリシー — 割り勘帳</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root { --cream: #F5F0E8; --paper: #FFFDF8; --ink: #2C2416; --ink-mid: #5C5347; --ink-light: #9E958B; --terracotta: #C65D3E; --border: #DDD7CD; }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Zen Kaku Gothic New', sans-serif; background: var(--cream); color: var(--ink); line-height: 1.8; -webkit-font-smoothing: antialiased; }
+    .container { max-width: 640px; margin: 0 auto; padding: 40px 24px 60px; }
+    .back-link { display: inline-block; font-size: 13px; color: var(--ink-light); text-decoration: none; margin-bottom: 24px; }
+    .back-link:hover { color: var(--terracotta); }
+    h1 { font-family: 'Shippori Mincho B1', serif; font-size: 24px; font-weight: 600; letter-spacing: 2px; margin-bottom: 8px; }
+    .last-updated { font-size: 12px; color: var(--ink-light); margin-bottom: 32px; }
+    h2 { font-family: 'Shippori Mincho B1', serif; font-size: 17px; font-weight: 600; margin-top: 32px; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+    p, li { font-size: 14px; color: var(--ink-mid); margin-bottom: 10px; }
+    ul { padding-left: 20px; }
+    li { margin-bottom: 6px; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 16px; font-size: 13px; }
+    th, td { padding: 8px 12px; border: 1px solid var(--border); text-align: left; }
+    th { background: var(--cream); color: var(--ink); font-weight: 500; }
+    td { color: var(--ink-mid); }
+    .contact { background: var(--paper); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="./" class="back-link">&larr; アプリに戻る</a>
+    <h1>プライバシーポリシー</h1>
+    <p class="last-updated">最終更新日: 2026年2月17日</p>
+
+    <p>本プライバシーポリシー（以下「本ポリシー」）は、「割り勘帳」（以下「本アプリ」）が取り扱う利用者の情報について、その収集、利用、管理の方針を定めるものです。</p>
+
+    <h2>1. 収集する情報</h2>
+    <p>本アプリは、サービス提供のために以下の情報を収集します。</p>
+    <table>
+      <tr><th>情報の種類</th><th>具体的な内容</th><th>収集方法</th></tr>
+      <tr><td>アカウント情報</td><td>メールアドレス、表示名（Googleログイン時はGoogleプロフィール名）</td><td>Firebase Authentication経由でのユーザー登録・ログイン時</td></tr>
+      <tr><td>認証識別子</td><td>Firebase UID（ユーザー固有の識別子）</td><td>アカウント作成時に自動生成</td></tr>
+      <tr><td>利用データ</td><td>グループ名、メンバー名、支出記録（カテゴリ、内容、金額、日付、支払者、負担割合）</td><td>ユーザーによるアプリ内入力</td></tr>
+    </table>
+
+    <h2>2. 情報の利用目的</h2>
+    <p>収集した情報は、以下の目的にのみ使用します。</p>
+    <ul>
+      <li>ユーザー認証およびアカウント管理</li>
+      <li>グループメンバー間のデータ同期（リアルタイム共有機能の提供）</li>
+      <li>支出記録の保存・表示・清算額の算出</li>
+    </ul>
+    <p>本アプリは、広告配信、行動追跡（トラッキング）、第三者へのデータ販売を一切行いません。</p>
+
+    <h2>3. 情報の保存場所と管理</h2>
+    <ul>
+      <li><strong>クラウド保存:</strong> Firebase Authentication およびFirebase Firestore（Google Cloud Platform）に保存されます。データはGoogleのセキュリティ基準に従い暗号化された状態で管理されます。</li>
+      <li><strong>端末内保存:</strong> オフライン利用のため、ブラウザのlocalStorageにデータのコピーが保存されます。</li>
+    </ul>
+
+    <h2>4. 第三者への提供</h2>
+    <p>本アプリは、以下の場合を除き、収集した個人情報を第三者に提供しません。</p>
+    <ul>
+      <li>法令に基づく場合</li>
+      <li>人の生命・身体・財産の保護のために必要な場合であって、本人の同意を得ることが困難な場合</li>
+      <li>ユーザーが自ら「合言葉」を共有し、グループメンバーとして招待した相手に対して、当該グループ内の支出データが共有される場合</li>
+    </ul>
+
+    <h2>5. 外部サービスの利用</h2>
+    <p>本アプリは以下の外部サービスを利用しています。各サービスのプライバシーポリシーもあわせてご確認ください。</p>
+    <ul>
+      <li><strong>Firebase（Google LLC）:</strong> 認証・データベース・ホスティング — <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Firebaseプライバシーポリシー</a></li>
+      <li><strong>Google Fonts:</strong> フォント配信 — <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Googleプライバシーポリシー</a></li>
+    </ul>
+
+    <h2>6. データの削除</h2>
+    <ul>
+      <li><strong>端末内データ:</strong> ブラウザの設定からlocalStorageを消去するか、アプリ内「設定」→「グループから退出する」で削除できます。</li>
+      <li><strong>クラウドデータ:</strong> アカウントおよび関連データの完全削除を希望される場合は、下記のお問い合わせ先までご連絡ください。</li>
+    </ul>
+
+    <h2>7. Cookieについて</h2>
+    <p>本アプリ自体はCookieを使用しません。ただし、Firebase Authenticationがセッション管理のためにブラウザのIndexedDBおよびlocalStorageを利用する場合があります。</p>
+
+    <h2>8. 本ポリシーの変更</h2>
+    <p>本ポリシーは、法令の変更やサービス内容の変更に伴い改定する場合があります。重要な変更がある場合は、アプリ内で通知します。</p>
+
+    <h2>9. お問い合わせ</h2>
+    <div class="contact">
+      <p>本ポリシーに関するお問い合わせは、以下までご連絡ください。</p>
+      <p><strong>アプリ名:</strong> 割り勘帳<br>
+      <strong>連絡先:</strong> youshimucun4@gmail.com</p>
+    </div>
+  </div>
+</body>
+</html>

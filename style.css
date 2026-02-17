@@ -1081,6 +1081,30 @@ body {
 .settings-extra .btn { width: 100%; margin-bottom: 8px; }
 .import-label { cursor: pointer; }
 
+/* Legal links (settings & start screen) */
+.settings-legal, .start-legal {
+  text-align: center;
+  padding-top: 16px;
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.start-legal {
+  margin-top: 32px;
+  border-top: none;
+}
+.legal-link {
+  font-size: 12px;
+  color: var(--ink-light);
+  text-decoration: none;
+  transition: color var(--transition);
+}
+.legal-link:hover { color: var(--terracotta); }
+.legal-sep {
+  font-size: 12px;
+  color: var(--ink-faint);
+  margin: 0 8px;
+}
+
 /* ============================================
    TOAST
    ============================================ */

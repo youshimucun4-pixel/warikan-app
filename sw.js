@@ -1,5 +1,5 @@
 // ふたりの割り勘帳 — Service Worker
-const CACHE_NAME = 'warikan-v7';
+const CACHE_NAME = 'warikan-v8';
 const ASSETS = [
   './',
   './index.html',
@@ -7,8 +7,6 @@ const ASSETS = [
   './app.js',
   './manifest.json',
   './icon.svg',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
 ];
 
 // インストール時にすべてのアセットをキャッシュ

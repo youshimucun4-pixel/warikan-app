@@ -6,7 +6,9 @@
 **用途:** 2人間の割り勘・建て替え・家計管理  
 **プラットフォーム:** PWA（Progressive Web App）— iPhone Safari / Android Chrome / PC ブラウザ対応  
 **ホスティング:** GitHub Pages  
-**バックエンド:** Firebase Firestore（リアルタイム同期） / localStorage（オフライン）
+**バックエンド:** Firebase Authentication（ユーザー認証） / Firebase Firestore（リアルタイム同期） / localStorage（オフライン）
+
+**認証:** 利用開始時にアカウント登録・ログインが必須。Googleログインまたはメール・パスワードで登録・ログインする。
 
 ---
 
@@ -21,6 +23,20 @@
 ---
 
 ## 3. 機能要件
+
+### 3.0 認証（アカウント）
+
+| 項目 | 仕様 |
+|---|---|
+| 起動時 | 未ログイン時は「最初の画面」を表示。ログイン・登録後にホーム画面へ遷移。 |
+| サインイン方法 | **Google**（推奨） / **メール・パスワード**（新規登録・ログイン） |
+| 最初の画面 | 「Googleで続ける」「メールで登録」「すでにアカウントがある方はログイン」 |
+| 設定内アカウント | 未ログイン時: Googleでログイン / メールで新規登録 / メールでログイン。ログイン時: 表示名・メール表示、ログアウト |
+| 技術 | Firebase Authentication（signInWithPopup for Google / createUserWithEmailAndPassword / signInWithEmailAndPassword） |
+| 認証済みドメイン | 本番利用時は Firebase Console の Authentication → Authorized domains に GitHub Pages ドメインを追加すること |
+
+- ログイン済みユーザーが再度アプリを開いた場合は、認証状態が復元されそのままホーム画面を表示する。
+- Firebase が利用できない環境では認証をスキップし、従来どおりホーム画面から利用可能（フォールバック）。
 
 ### 3.1 グループ管理
 
@@ -112,6 +128,7 @@ rooms/
 
 ### 3.7 設定
 
+- **アカウント:** ログイン状態の表示、Googleでログイン / メールで新規登録・ログイン、ログアウト
 - グループ名の変更
 - メンバー名の変更（Firebase時はサーバーに反映）
 - 合言葉コードの表示・コピー（Firebase時のみ）
@@ -192,7 +209,12 @@ rooms/
 ## 6. 画面遷移
 
 ```
-[ホーム画面]
+[最初の画面]（未ログイン時のみ表示）
+  ├─ Googleで続ける → ポップアップでGoogleログイン → [ホーム画面]
+  ├─ メールで登録 → [認証モーダル] 新規登録 → [ホーム画面]
+  └─ すでにアカウントがある方はログイン → [認証モーダル] ログイン → [ホーム画面]
+
+[ホーム画面]（ログイン済み、または Firebase 未使用時）
   ├─ グループカード タップ → [メイン画面]
   │                           ├─ 記録タブ（デフォルト）
   │                           │   ├─ サマリー
@@ -201,7 +223,7 @@ rooms/
   │                           ├─ 分析タブ
   │                           │   ├─ ドーナツチャート
   │                           │   └─ 月別推移棒グラフ
-  │                           ├─ 設定（モーダル）
+  │                           ├─ 設定（モーダル）※アカウント表示・ログアウト含む
   │                           └─ ← 戻る → [ホーム画面]
   ├─ ⋮ ボタン → [グループ操作モーダル]
   │               ├─ 名前を変更 → [リネームモーダル]
@@ -212,11 +234,14 @@ rooms/
                            └─ ローカル: 直接作成
 ```
 
-### 初回起動時
+### 起動時の表示
 
-- グループが0件 → セットアップ画面を直接表示
-- グループが1件 → そのグループに自動入室
-- グループが2件以上 → ホーム画面を表示
+- **Firebase 利用時・未ログイン:** 最初の画面（アカウント登録・ログイン）を表示。ログイン後にホーム画面へ。
+- **Firebase 利用時・ログイン済み:** 認証状態を復元し、ホーム画面を表示。
+- **Firebase 未使用時:** 従来どおりホーム画面を表示。
+- ホーム画面での表示:
+  - グループが0件 → オンボーディング（はじめましょう）＋ セットアップ誘導
+  - グループが1件以上 → グループ一覧
 
 ---
 
@@ -225,11 +250,12 @@ rooms/
 | レイヤー | 技術 |
 |---|---|
 | フロントエンド | HTML / CSS / Vanilla JavaScript |
+| 認証 | Firebase Authentication（Google / メール・パスワード） |
 | ストレージ | localStorage（ローカル）/ Firebase Firestore（同期） |
 | ホスティング | GitHub Pages + GitHub Actions |
 | PWA | Service Worker + manifest.json |
 | フォント | Google Fonts (Shippori Mincho B1, Zen Kaku Gothic New) |
-| Firebase SDK | v10.14.0 (compat) |
+| Firebase SDK | v10.14.0 (compat): firebase-app, firebase-auth, firebase-firestore |
 
 ---
 
@@ -237,8 +263,8 @@ rooms/
 
 ```
 warikan-app/
-├── index.html          # メインHTML（全画面・モーダル含む）
-├── app.js              # アプリケーションロジック
+├── index.html          # メインHTML（最初の画面・ホーム・メイン・セットアップ・認証モーダル・設定等）
+├── app.js              # アプリケーションロジック（認証・グループ・支出・分析・設定）
 ├── style.css           # スタイルシート
 ├── sw.js               # Service Worker
 ├── manifest.json       # PWAマニフェスト
@@ -255,13 +281,15 @@ warikan-app/
 
 - グループメンバーは2人固定（将来的に4人まで拡張予定）
 - アクティブグループ上限は3つ（Firebase無料枠の容量内で十分運用可能）
-- ユーザー認証なし（合言葉ベースのペアリング）
+- **ユーザー認証:** Firebase 利用時はアカウント登録・ログインが必須（Google または メール・パスワード）。グループ間の共有は従来どおり合言葉（ルームコード）ベース。
+- 本番ドメインで Google ログインを使う場合は、Firebase Console の Authentication → Authorized domains に該当ドメインを追加すること。
 - Firebase Firestoreのテストモードルール使用中（本番運用時はセキュリティルール設定推奨）
 
 ---
 
 ## 10. 今後の拡張候補
 
+- 認証ユーザーと Firestore ルームの紐付け（「自分のグループ」のクラウド保存）
 - 3〜4人グループのN人清算対応（Greedy Algorithm）
 - 月次レポートの自動生成・共有
 - 定期的な支出テンプレート（家賃等の自動入力）

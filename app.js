@@ -220,6 +220,7 @@ async function createRoom(user1, user2) {
 
   await ref.set({
     users: { user1, user2 },
+    memberUids: [currentAuthUser.uid],
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   });
   return code;
@@ -229,6 +230,12 @@ async function joinRoom(code) {
   const upperCode = code.toUpperCase().trim();
   const snap = await db.collection('rooms').doc(upperCode).get();
   if (!snap.exists) throw new Error('ルームが見つかりません。合言葉を確認してください');
+  // 参加者のUIDをメンバーリストに追加
+  if (currentAuthUser) {
+    await db.collection('rooms').doc(upperCode).update({
+      memberUids: firebase.firestore.FieldValue.arrayUnion(currentAuthUser.uid)
+    });
+  }
   return { code: upperCode, users: snap.data().users };
 }
 
