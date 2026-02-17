@@ -992,6 +992,63 @@ body {
 }
 .form-actions .btn { flex: 1; }
 
+/* Settings account section */
+.settings-account-section {
+  padding-bottom: 18px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+.settings-account-section h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-light);
+  margin-bottom: 10px;
+}
+.account-guest,
+.account-user {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.account-guest-text {
+  font-size: 12px;
+  color: var(--ink-light);
+  margin-bottom: 4px;
+}
+.account-user-email {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  word-break: break-all;
+}
+
+/* Auth modal (sign up / login) */
+.auth-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+}
+.auth-tab {
+  flex: 1;
+  padding: 10px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--cream);
+  font-family: var(--ff-sans);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-mid);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.auth-tab.active {
+  border-color: var(--terracotta);
+  background: var(--terracotta-pale);
+  color: var(--terracotta-deep);
+}
+.auth-form .form-group { margin-bottom: 14px; }
+.auth-form .form-actions { padding-top: 8px; }
+
 /* Settings extra */
 .settings-extra {
   margin-top: 20px;

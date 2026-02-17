@@ -19,14 +19,23 @@ const USE_FIREBASE = typeof firebase !== 'undefined' &&
   !FIREBASE_CONFIG.projectId.startsWith('YOUR');
 
 let db = null;
+let auth = null;
+let currentAuthUser = null;
+
 if (USE_FIREBASE) {
   try {
     firebase.initializeApp(FIREBASE_CONFIG);
     db = firebase.firestore();
     db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+    auth = firebase.auth();
+    auth.onAuthStateChanged(user => {
+      currentAuthUser = user;
+      updateAuthUI();
+    });
   } catch (e) {
     console.error('Firebase init error:', e);
     db = null;
+    auth = null;
   }
 }
 
@@ -977,8 +986,121 @@ function showConfirm(msg, onOk) {
   showModal($('confirm-dialog'));
 }
 
+// ==================== 認証（メール登録・ログイン） ====================
+function updateAuthUI() {
+  const guest = $('settings-account-guest');
+  const userBlock = $('settings-account-user');
+  const emailEl = $('settings-account-email');
+  if (!guest || !userBlock) return;
+  if (currentAuthUser) {
+    guest.classList.add('hidden');
+    userBlock.classList.remove('hidden');
+    if (emailEl) emailEl.textContent = currentAuthUser.email || '';
+  } else {
+    guest.classList.remove('hidden');
+    userBlock.classList.add('hidden');
+  }
+}
+
+function setAuthTab(mode) {
+  const isSignup = mode === 'signup';
+  $('auth-tab-signup').classList.toggle('active', isSignup);
+  $('auth-tab-login').classList.toggle('active', !isSignup);
+  $('auth-modal-title').textContent = isSignup ? 'アカウント登録' : 'ログイン';
+  $('auth-submit').textContent = isSignup ? '登録する' : 'ログイン';
+  const wrap = $('auth-confirm-wrap');
+  if (wrap) wrap.classList.toggle('hidden', !isSignup);
+  $('auth-password-confirm').required = isSignup;
+  [$('auth-error-email'), $('auth-error-password'), $('auth-error-confirm'), $('auth-error-general')].forEach(el => {
+    if (el) { el.classList.add('hidden'); el.textContent = ''; }
+  });
+}
+
+function openAuthModal(mode) {
+  setAuthTab(mode || 'signup');
+  $('auth-email').value = '';
+  $('auth-password').value = '';
+  $('auth-password-confirm').value = '';
+  showModal($('auth-modal'));
+}
+
+function closeAuthModal() {
+  hideModal($('auth-modal'));
+}
+
+async function authFormSubmit(e) {
+  e.preventDefault();
+  const email = ($('auth-email').value || '').trim();
+  const password = $('auth-password').value || '';
+  const confirm = $('auth-password-confirm').value || '';
+  const isSignup = $('auth-tab-signup').classList.contains('active');
+  const errEmail = $('auth-error-email');
+  const errPass = $('auth-error-password');
+  const errConfirm = $('auth-error-confirm');
+  const errGeneral = $('auth-error-general');
+  [errEmail, errPass, errConfirm, errGeneral].forEach(el => { if (el) { el.classList.add('hidden'); el.textContent = ''; } });
+
+  if (!email) {
+    errEmail.textContent = 'メールアドレスを入力してください';
+    errEmail.classList.remove('hidden');
+    return;
+  }
+  if (!password) {
+    errPass.textContent = 'パスワードを入力してください';
+    errPass.classList.remove('hidden');
+    return;
+  }
+  if (password.length < 6) {
+    errPass.textContent = 'パスワードは6文字以上にしてください';
+    errPass.classList.remove('hidden');
+    return;
+  }
+  if (isSignup && password !== confirm) {
+    errConfirm.textContent = 'パスワードが一致しません';
+    errConfirm.classList.remove('hidden');
+    return;
+  }
+
+  if (!auth) {
+    showToast('認証機能が利用できません', { type: 'error' });
+    return;
+  }
+
+  try {
+    if (isSignup) {
+      await auth.createUserWithEmailAndPassword(email, password);
+      showToast('アカウントを登録しました', { type: 'success' });
+    } else {
+      await auth.signInWithEmailAndPassword(email, password);
+      showToast('ログインしました', { type: 'success' });
+    }
+    closeAuthModal();
+  } catch (err) {
+    const code = err.code || '';
+    let msg = err.message || 'エラーが発生しました';
+    if (code === 'auth/email-already-in-use') msg = 'このメールアドレスは既に登録されています';
+    else if (code === 'auth/invalid-email') msg = '有効なメールアドレスを入力してください';
+    else if (code === 'auth/weak-password') msg = 'パスワードは6文字以上にしてください';
+    else if (code === 'auth/user-not-found' || code === 'auth/wrong-password') msg = 'メールアドレスまたはパスワードが違います';
+    errGeneral.textContent = msg;
+    errGeneral.classList.remove('hidden');
+  }
+}
+
+async function logout() {
+  if (!auth) return;
+  try {
+    await auth.signOut();
+    showToast('ログアウトしました', { type: 'success' });
+    updateAuthUI();
+  } catch (e) {
+    showToast('ログアウトに失敗しました', { type: 'error' });
+  }
+}
+
 // ==================== 設定 ====================
 function openSettings() {
+  updateAuthUI();
   $('settings-user1').value = appData.users.user1;
   $('settings-user2').value = appData.users.user2;
   const sgn = $('settings-group-name');
@@ -1240,6 +1362,18 @@ function setupEvents() {
   $('export-btn').addEventListener('click', exportData);
   $('reset-btn').addEventListener('click', resetRoom);
 
+  // === アカウント（認証） ===
+  if ($('btn-open-signup')) $('btn-open-signup').addEventListener('click', () => openAuthModal('signup'));
+  if ($('btn-open-login')) $('btn-open-login').addEventListener('click', () => openAuthModal('login'));
+  if ($('btn-logout')) $('btn-logout').addEventListener('click', logout);
+  if ($('auth-modal')) {
+    if ($('auth-modal-close')) $('auth-modal-close').addEventListener('click', closeAuthModal);
+    $('auth-modal').querySelector('.modal-overlay')?.addEventListener('click', closeAuthModal);
+    if ($('auth-tab-signup')) $('auth-tab-signup').addEventListener('click', () => setAuthTab('signup'));
+    if ($('auth-tab-login')) $('auth-tab-login').addEventListener('click', () => setAuthTab('login'));
+    if ($('auth-form')) $('auth-form').addEventListener('submit', authFormSubmit);
+  }
+
   // === グループアクション ===
   $('group-action-close').addEventListener('click', () => hideModal($('group-action-modal')));
   $('group-action-modal').querySelector('.modal-overlay').addEventListener('click', () => hideModal($('group-action-modal')));
@@ -1264,6 +1398,7 @@ function setupEvents() {
       else if (!$('rename-modal').classList.contains('hidden')) hideModal($('rename-modal'));
       else if (!$('group-action-modal').classList.contains('hidden')) hideModal($('group-action-modal'));
       else if (!$('expense-modal').classList.contains('hidden')) hideModal($('expense-modal'));
+      else if ($('auth-modal') && !$('auth-modal').classList.contains('hidden')) closeAuthModal();
       else if (!$('settings-modal').classList.contains('hidden')) hideModal($('settings-modal'));
     }
   });
