@@ -11,10 +11,19 @@ service cloud.firestore {
       // 作成: 認証済み + memberUids に自分が含まれる + 必須フィールド検証
       allow create: if request.auth != null
         && request.auth.uid in request.resource.data.memberUids
-        && request.resource.data.users is map
-        && request.resource.data.users.user1 is string
-        && request.resource.data.users.user2 is string
-        && request.resource.data.memberUids is list;
+        && request.resource.data.memberUids is list
+        && (
+          // ペアモード（既存）
+          (request.resource.data.users is map
+           && request.resource.data.users.user1 is string
+           && request.resource.data.users.user2 is string)
+          ||
+          // グループモード（新規: 3-10人）
+          (request.resource.data.mode == 'group'
+           && request.resource.data.members is list
+           && request.resource.data.members.size() >= 3
+           && request.resource.data.members.size() <= 10)
+        );
 
       // 更新: 認証済み + 既存メンバーのみ
       allow update: if request.auth != null

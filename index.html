@@ -144,6 +144,11 @@
               <span class="mode-choice-label">ふたりで使う</span>
               <span class="mode-choice-desc">割り勘・建て替え管理</span>
             </button>
+            <button id="btn-mode-group" class="mode-choice-btn">
+              <span class="mode-choice-icon">🍻</span>
+              <span class="mode-choice-label">グループで使う</span>
+              <span class="mode-choice-desc">3〜10人の飲み会・旅行に</span>
+            </button>
             <button type="button" id="btn-mode-back" class="btn-link hidden">&larr; ホームに戻る</button>
           </div>
         </div>
@@ -267,6 +272,55 @@
           </div>
         </div>
       </div>
+
+        <!-- ステップ: グループ選択 (Firebase モード: 作成 or 参加) -->
+        <div id="step-group-choice" class="setup-step hidden">
+          <p class="setup-desc">グループを作って<br>みんなで共有しましょう</p>
+          <div class="setup-form">
+            <button id="btn-to-group-create" class="btn btn-warm btn-block">新しいグループをつくる</button>
+            <button id="btn-to-group-join" class="btn btn-outline btn-block">グループに参加する</button>
+            <button type="button" id="btn-back-group-choice" class="btn-link">&larr; もどる</button>
+          </div>
+        </div>
+
+        <!-- ステップ: グループ作成 (グループモード) -->
+        <div id="step-group-create" class="setup-step hidden">
+          <p class="setup-desc">グループの情報を入力してください</p>
+          <div class="setup-form">
+            <div class="setup-field">
+              <input type="text" id="group-mode-name-input" placeholder="グループ名（例：新年会）" maxlength="20">
+            </div>
+            <div class="setup-divider"></div>
+            <div id="group-members-inputs" class="group-members-inputs">
+              <div class="setup-field group-member-field"><input type="text" placeholder="メンバー1の名前" maxlength="10"></div>
+              <div class="setup-field group-member-field"><input type="text" placeholder="メンバー2の名前" maxlength="10"></div>
+              <div class="setup-field group-member-field"><input type="text" placeholder="メンバー3の名前" maxlength="10"></div>
+            </div>
+            <button type="button" id="btn-add-member" class="btn btn-outline btn-sm">＋ メンバーを追加</button>
+            <button id="btn-create-group-room" class="btn btn-warm btn-block">つくる</button>
+            <button type="button" id="btn-back-group-create" class="btn-link">&larr; もどる</button>
+          </div>
+        </div>
+
+        <!-- ステップ: ローカルグループ作成 (Firebase未設定) -->
+        <div id="step-local-group" class="setup-step hidden">
+          <p class="setup-desc">グループの情報を入力してください</p>
+          <div class="setup-form">
+            <div class="setup-field">
+              <input type="text" id="local-group-mode-name" placeholder="グループ名（例：新年会）" maxlength="20">
+            </div>
+            <div class="setup-divider"></div>
+            <div id="local-group-members-inputs" class="group-members-inputs">
+              <div class="setup-field group-member-field"><input type="text" placeholder="メンバー1の名前" maxlength="10"></div>
+              <div class="setup-field group-member-field"><input type="text" placeholder="メンバー2の名前" maxlength="10"></div>
+              <div class="setup-field group-member-field"><input type="text" placeholder="メンバー3の名前" maxlength="10"></div>
+            </div>
+            <button type="button" id="btn-add-local-member" class="btn btn-outline btn-sm">＋ メンバーを追加</button>
+            <button id="btn-create-local-group" class="btn btn-warm btn-block">はじめる</button>
+            <button type="button" id="btn-back-local-group" class="btn-link">&larr; もどる</button>
+            <p class="setup-hint">※ オフラインモード（同期なし）</p>
+          </div>
+        </div>
     </div>
 
     <!-- ====== メイン画面 ====== -->
@@ -330,6 +384,28 @@
           </div>
           <div class="settlement-actions hidden" id="settlement-actions">
             <button id="btn-line-share" class="btn btn-outline btn-sm settlement-action-btn" title="LINEで送る">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="#06C755"><path d="M12 2C6.48 2 2 5.88 2 10.54c0 4.24 3.76 7.78 8.84 8.45.34.07.81.23.93.52.1.27.07.68.03.95l-.15.89c-.05.27-.21 1.05.92.57s6.13-3.61 8.36-6.18C22.58 13.78 22 12.2 22 10.54 22 5.88 17.52 2 12 2z"/></svg>
+              <span>LINEで送る</span>
+            </button>
+          </div>
+          <div class="ledger-bottom-rule"></div>
+        </section>
+
+        <!-- グループモード用レジャー（group-mode時のみ表示） -->
+        <section class="ledger group-ledger hidden" id="group-ledger" style="--delay:3">
+          <div class="ledger-top-rule"></div>
+          <div class="ledger-total">
+            <span class="ledger-total-label">合計支出</span>
+            <span class="ledger-total-amount" id="group-ledger-total">¥0</span>
+          </div>
+          <div class="ledger-rule"></div>
+          <div class="group-members-grid" id="group-members-grid"></div>
+          <div class="ledger-rule"></div>
+          <div class="group-settlement" id="group-settlement">
+            <span style="color:var(--ink-light)">まだ支出がありません</span>
+          </div>
+          <div class="settlement-actions hidden" id="group-settlement-actions">
+            <button id="btn-group-line-share" class="btn btn-outline btn-sm settlement-action-btn" title="LINEで送る">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="#06C755"><path d="M12 2C6.48 2 2 5.88 2 10.54c0 4.24 3.76 7.78 8.84 8.45.34.07.81.23.93.52.1.27.07.68.03.95l-.15.89c-.05.27-.21 1.05.92.57s6.13-3.61 8.36-6.18C22.58 13.78 22 12.2 22 10.54 22 5.88 17.52 2 12 2z"/></svg>
               <span>LINEで送る</span>
             </button>
@@ -461,6 +537,29 @@
               <label class="payer-option"><input type="radio" name="full-payer" value="user2"><span class="payer-label" id="full-user2-name"></span></label>
             </div>
           </div>
+          <!-- グループモード: 支払った人 -->
+          <div class="form-group hidden" id="group-payer-section">
+            <label>支払った人</label>
+            <div class="group-payer-grid" id="group-payer-grid"></div>
+          </div>
+          <!-- グループモード: 負担 -->
+          <div class="form-group hidden" id="group-split-section">
+            <label>負担する人</label>
+            <div class="split-options">
+              <label class="split-pill"><input type="radio" name="group-split-type" value="equal-all" checked><span>全員で均等</span></label>
+              <label class="split-pill"><input type="radio" name="group-split-type" value="equal-select"><span>選んで均等</span></label>
+              <label class="split-pill"><input type="radio" name="group-split-type" value="custom"><span>金額指定</span></label>
+            </div>
+          </div>
+          <!-- グループモード: メンバー選択（選んで均等時） -->
+          <div class="form-group hidden" id="group-split-select">
+            <div class="group-member-checkboxes" id="group-split-checkboxes"></div>
+          </div>
+          <!-- グループモード: カスタム金額入力 -->
+          <div class="form-group hidden" id="group-split-custom">
+            <div class="group-split-custom-list" id="group-split-custom-list"></div>
+            <div class="split-hint" id="group-split-hint"></div>
+          </div>
           <div class="form-actions">
             <button type="button" id="delete-expense-btn" class="btn btn-ghost-danger hidden">削除</button>
             <button type="submit" class="btn btn-warm">保存する</button>
@@ -516,6 +615,11 @@
           <div class="form-group" id="settings-user2-group">
             <label for="settings-user2">ふたりめの名前</label>
             <input type="text" id="settings-user2" maxlength="10">
+          </div>
+          <div class="form-group hidden" id="settings-group-members">
+            <label>メンバー</label>
+            <div id="settings-members-list" class="settings-members-list"></div>
+            <button type="button" id="settings-add-member" class="btn btn-outline btn-sm">＋ メンバーを追加</button>
           </div>
           <div class="form-actions">
             <button id="settings-save" class="btn btn-warm">保存</button>

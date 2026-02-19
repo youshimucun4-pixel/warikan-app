@@ -66,7 +66,7 @@ const MAX_GROUPS = 3;
 
 let groups = [];
 let currentGroupId = null;
-let appData = { users: { user1: '', user2: '' }, expenses: [], groupName: '' };
+let appData = { users: { user1: '', user2: '' }, members: [], expenses: [], groupName: '' };
 const _now = new Date();
 let currentMonth = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}`;
 let editingExpenseId = null;
@@ -152,6 +152,78 @@ function isSoloMode(groupId) {
   return group && group.mode === 'solo';
 }
 
+function isGroupMode(groupId) {
+  const gid = groupId || currentGroupId;
+  if (!gid) return false;
+  const group = groups.find(g => g.id === gid);
+  return group && group.mode === 'group';
+}
+
+// ==================== グループモード: 清算計算 ====================
+function calcGroupSummary() {
+  const exps = getMonthExpenses();
+  const members = appData.members || [];
+  const paid = {};
+  const owed = {};
+  let total = 0;
+  members.forEach(m => { paid[m.id] = 0; owed[m.id] = 0; });
+  exps.forEach(e => {
+    total += e.amount;
+    paid[e.paidBy] = (paid[e.paidBy] || 0) + e.amount;
+    if (e.splits) {
+      Object.entries(e.splits).forEach(([mid, amt]) => {
+        owed[mid] = (owed[mid] || 0) + amt;
+      });
+    }
+  });
+  const balances = members.map(m => ({
+    id: m.id, name: m.name,
+    paid: paid[m.id] || 0,
+    owed: owed[m.id] || 0,
+    net: (paid[m.id] || 0) - (owed[m.id] || 0)
+  }));
+  return { total, balances, transfers: calcMinTransfers(balances) };
+}
+
+function calcMinTransfers(balances) {
+  const debtors = [];
+  const creditors = [];
+  balances.forEach(b => {
+    if (b.net < -0.5) debtors.push({ id: b.id, name: b.name, amount: Math.round(-b.net) });
+    if (b.net > 0.5) creditors.push({ id: b.id, name: b.name, amount: Math.round(b.net) });
+  });
+  debtors.sort((a, b) => b.amount - a.amount);
+  creditors.sort((a, b) => b.amount - a.amount);
+  const transfers = [];
+  let di = 0, ci = 0;
+  while (di < debtors.length && ci < creditors.length) {
+    const transfer = Math.min(debtors[di].amount, creditors[ci].amount);
+    if (transfer > 0) {
+      transfers.push({ from: debtors[di].name, fromId: debtors[di].id, to: creditors[ci].name, toId: creditors[ci].id, amount: transfer });
+    }
+    debtors[di].amount -= transfer;
+    creditors[ci].amount -= transfer;
+    if (debtors[di].amount <= 0) di++;
+    if (creditors[ci].amount <= 0) ci++;
+  }
+  return transfers;
+}
+
+// ==================== グループモード: Firestore ルーム作成 ====================
+async function createGroupRoom(members) {
+  const code = generateRoomCode();
+  const ref = db.collection('rooms').doc(code);
+  const existing = await ref.get();
+  if (existing.exists) return createGroupRoom(members);
+  await ref.set({
+    mode: 'group',
+    members: members,
+    memberUids: [currentAuthUser.uid],
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+  return code;
+}
+
 function applySoloFormMode() {
   const solo = isSoloMode();
   // 支払った人セクション
@@ -187,7 +259,7 @@ function loadGroupData(groupId) {
     const raw = localStorage.getItem(getGroupDataKey(groupId));
     if (raw) return JSON.parse(raw);
   } catch {}
-  return { users: { user1: '', user2: '' }, expenses: [], groupName: '' };
+  return { users: { user1: '', user2: '' }, members: [], expenses: [], groupName: '' };
 }
 
 function saveGroupData(groupId, data) {
@@ -219,7 +291,7 @@ function showStartScreen() {
 }
 
 function showSetupStep(stepId) {
-  ['step-mode', 'step-choice', 'step-create', 'step-code', 'step-join', 'step-loading', 'step-local', 'step-solo-create', 'step-local-solo']
+  ['step-mode', 'step-choice', 'step-create', 'step-code', 'step-join', 'step-loading', 'step-local', 'step-solo-create', 'step-local-solo', 'step-group-create', 'step-group-choice', 'step-local-group']
     .forEach(k => { const el = $(k); if (el) el.classList.add('hidden'); });
   $(stepId).classList.remove('hidden');
 }
@@ -256,7 +328,8 @@ async function joinRoom(code) {
       memberUids: firebase.firestore.FieldValue.arrayUnion(currentAuthUser.uid)
     });
   }
-  return { code: upperCode, users: snap.data().users };
+  const roomData = snap.data();
+  return { code: upperCode, users: roomData.users, members: roomData.members, mode: roomData.mode };
 }
 
 function startListening() {
@@ -269,10 +342,19 @@ function startListening() {
 
   unsubRoom = db.collection('rooms').doc(group.roomCode)
     .onSnapshot(snap => {
-      if (snap.exists && snap.data().users) {
-        appData.users = snap.data().users;
-        syncNames();
-        renderSummary();
+      if (snap.exists) {
+        const data = snap.data();
+        if (isGroupMode()) {
+          if (data.members) {
+            appData.members = data.members;
+            saveLocal();
+            renderSummary();
+          }
+        } else if (data.users) {
+          appData.users = data.users;
+          syncNames();
+          renderSummary();
+        }
       }
     }, err => console.warn('Room listener error:', err));
 
@@ -360,17 +442,22 @@ function renderGroupList() {
 function createGroupCard(group, index, isArchived) {
   const data = loadGroupData(group.id);
   const isSolo = group.mode === 'solo';
+  const isGroup = group.mode === 'group';
   const el = document.createElement('div');
-  el.className = 'group-card' + (isArchived ? ' group-card-archived' : '') + (isSolo ? ' group-card-solo' : '');
+  el.className = 'group-card' + (isArchived ? ' group-card-archived' : '') + (isSolo ? ' group-card-solo' : '') + (isGroup ? ' group-card-group' : '');
   el.style.setProperty('--item-i', index);
 
   const memberNames = isSolo
     ? (data.users.user1 || '個人')
-    : (data.users.user1 && data.users.user2
-      ? `${data.users.user1} & ${data.users.user2}`
-      : 'メンバー未設定');
+    : isGroup
+      ? ((data.members || []).map(m => m.name).join('・') || 'メンバー未設定')
+      : (data.users.user1 && data.users.user2
+        ? `${data.users.user1} & ${data.users.user2}`
+        : 'メンバー未設定');
 
-  const modeBadge = isSolo ? '<span class="group-card-badge">個人</span>' : '';
+  const modeBadge = isSolo ? '<span class="group-card-badge">個人</span>'
+    : isGroup ? `<span class="group-card-badge group-badge">${(data.members || []).length}人</span>`
+    : '';
   const syncBadge = group.roomCode
     ? '<span class="group-card-sync">同期</span>'
     : '<span class="group-card-badge">ローカル</span>';
@@ -409,8 +496,22 @@ function openGroup(groupId) {
   buildCategoryGrid();
   showScreen('main-screen');
 
-  // ソロモード用クラス切替
-  $('main-screen').classList.toggle('solo-mode', isSoloMode(groupId));
+  // モード用クラス切替
+  const solo = isSoloMode(groupId);
+  const groupMode = isGroupMode(groupId);
+  $('main-screen').classList.toggle('solo-mode', solo);
+  $('main-screen').classList.toggle('group-mode', groupMode);
+
+  // レジャーセクション切替
+  const pairLedger = $('main-screen').querySelector('.ledger:not(.group-ledger)');
+  const groupLedger = $('group-ledger');
+  if (groupMode) {
+    if (pairLedger) pairLedger.classList.add('hidden');
+    if (groupLedger) groupLedger.classList.remove('hidden');
+  } else {
+    if (pairLedger) pairLedger.classList.remove('hidden');
+    if (groupLedger) groupLedger.classList.add('hidden');
+  }
 
   syncNames();
   renderMonth();
@@ -489,6 +590,7 @@ function goToSetup(hasGroups) {
 
 // ==================== 名前同期 ====================
 function syncNames() {
+  if (isGroupMode()) return; // グループモードは動的生成のため不要
   const { user1, user2 } = appData.users;
   const solo = isSoloMode();
   const u1El = $('ledger-user1-name');
@@ -571,6 +673,7 @@ function calcSummary() {
 }
 
 function renderSummary() {
+  if (isGroupMode()) { renderGroupSummary(); return; }
   const s = calcSummary();
   const solo = isSoloMode();
   $('ledger-total').textContent = yen(s.total);
@@ -823,6 +926,7 @@ function renderTrendChart() {
 function renderExpenses() {
   const exps = getMonthExpenses();
   const solo = isSoloMode();
+  const groupMode = isGroupMode();
   exps.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.id || '').localeCompare(a.id || ''));
   $('expense-count').textContent = `${exps.length}件`;
   const listEl = $('expense-list');
@@ -837,14 +941,28 @@ function renderExpenses() {
   listEl.innerHTML = '';
   exps.forEach((exp, i) => {
     const cat = getCategoryById(exp.category || 'other');
-    const payerName = exp.paidBy === 'user1' ? appData.users.user1 : appData.users.user2;
-    const payerColor = exp.paidBy === 'user1' ? 'var(--terracotta)' : 'var(--slate)';
     const dateStr = (exp.date || '').slice(5).replace('-', '/');
-    let splitLabel = '';
-    if (exp.splitUser1 === 50 && exp.splitUser2 === 50) splitLabel = '50:50';
-    else if (exp.splitUser1 === 100) splitLabel = `${appData.users.user1}負担`;
-    else if (exp.splitUser2 === 100) splitLabel = `${appData.users.user2}負担`;
-    else splitLabel = `${exp.splitUser1}:${exp.splitUser2}`;
+    let payerName, payerColor, splitLabel;
+    if (groupMode) {
+      const member = (appData.members || []).find(m => m.id === exp.paidBy);
+      payerName = member ? member.name : '?';
+      payerColor = 'var(--terracotta)';
+      if (exp.splits) {
+        const splitCount = Object.keys(exp.splits).length;
+        const totalMembers = (appData.members || []).length;
+        splitLabel = splitCount === totalMembers ? `${splitCount}人で均等` : `${splitCount}人`;
+      } else {
+        splitLabel = '';
+      }
+    } else {
+      payerName = exp.paidBy === 'user1' ? appData.users.user1 : appData.users.user2;
+      payerColor = exp.paidBy === 'user1' ? 'var(--terracotta)' : 'var(--slate)';
+      splitLabel = '';
+      if (exp.splitUser1 === 50 && exp.splitUser2 === 50) splitLabel = '50:50';
+      else if (exp.splitUser1 === 100) splitLabel = `${appData.users.user1}負担`;
+      else if (exp.splitUser2 === 100) splitLabel = `${appData.users.user2}負担`;
+      else splitLabel = `${exp.splitUser1}:${exp.splitUser2}`;
+    }
 
     const el = document.createElement('div');
     el.className = 'expense-item';
@@ -907,7 +1025,12 @@ function openAddExpense() {
   $('split-user1-pct').value = 50;
   $('split-user2-pct').value = 50;
   updateSplitVis();
-  applySoloFormMode();
+  if (isGroupMode()) {
+    applyGroupFormMode();
+  } else {
+    hideGroupFormSections();
+    applySoloFormMode();
+  }
   showModal($('expense-modal'));
 }
 
@@ -923,20 +1046,54 @@ function openEditExpense(id) {
   $('expense-desc').value = exp.description;
   $('expense-amount').value = exp.amount;
   $('expense-date').value = exp.date;
-  document.querySelector(`input[name="paid-by"][value="${exp.paidBy}"]`).checked = true;
-  if (exp.splitUser1 === 50 && exp.splitUser2 === 50) {
-    document.querySelector('input[name="split-type"][value="equal"]').checked = true;
-  } else if (exp.splitUser1 === 100 || exp.splitUser2 === 100) {
-    document.querySelector('input[name="split-type"][value="full"]').checked = true;
-    document.querySelector(`input[name="full-payer"][value="${exp.splitUser1 === 100 ? 'user1' : 'user2'}"]`).checked = true;
+  if (isGroupMode()) {
+    applyGroupFormMode();
+    // 支払者を選択
+    const payerRadio = document.querySelector(`input[name="group-payer"][value="${exp.paidBy}"]`);
+    if (payerRadio) payerRadio.checked = true;
+    // 割り方を判定
+    if (exp.splits) {
+      const splitMembers = Object.keys(exp.splits);
+      const totalMembers = (appData.members || []).length;
+      const allEqual = splitMembers.length > 1 && new Set(Object.values(exp.splits)).size <= 2; // 均等（端数差1円以内）
+      if (splitMembers.length === totalMembers && allEqual) {
+        document.querySelector('input[name="group-split-type"][value="equal-all"]').checked = true;
+      } else if (allEqual) {
+        document.querySelector('input[name="group-split-type"][value="equal-select"]').checked = true;
+        updateGroupSplitVis();
+        // チェックボックスを設定
+        $('group-split-checkboxes').querySelectorAll('input').forEach(cb => {
+          const checked = splitMembers.includes(cb.value);
+          cb.checked = checked;
+          cb.closest('.group-member-check').classList.toggle('checked', checked);
+        });
+      } else {
+        document.querySelector('input[name="group-split-type"][value="custom"]').checked = true;
+        updateGroupSplitVis();
+        // カスタム金額を設定
+        Object.entries(exp.splits).forEach(([mid, amt]) => {
+          const inp = document.getElementById('group-custom-' + mid);
+          if (inp) inp.value = amt;
+        });
+      }
+    }
   } else {
-    document.querySelector('input[name="split-type"][value="custom"]').checked = true;
+    document.querySelector(`input[name="paid-by"][value="${exp.paidBy}"]`).checked = true;
+    if (exp.splitUser1 === 50 && exp.splitUser2 === 50) {
+      document.querySelector('input[name="split-type"][value="equal"]').checked = true;
+    } else if (exp.splitUser1 === 100 || exp.splitUser2 === 100) {
+      document.querySelector('input[name="split-type"][value="full"]').checked = true;
+      document.querySelector(`input[name="full-payer"][value="${exp.splitUser1 === 100 ? 'user1' : 'user2'}"]`).checked = true;
+    } else {
+      document.querySelector('input[name="split-type"][value="custom"]').checked = true;
+    }
+    $('split-user1-pct').value = exp.splitUser1;
+    $('split-user2-pct').value = exp.splitUser2;
+    updateSplitVis();
+    updateSplitHint();
+    hideGroupFormSections();
+    applySoloFormMode();
   }
-  $('split-user1-pct').value = exp.splitUser1;
-  $('split-user2-pct').value = exp.splitUser2;
-  updateSplitVis();
-  updateSplitHint();
-  applySoloFormMode();
   showModal($('expense-modal'));
 }
 
@@ -945,8 +1102,12 @@ async function saveExpense() {
   const description = $('expense-desc').value.trim();
   const amount = parseInt($('expense-amount').value, 10);
   const date = $('expense-date').value;
-  const paidBy = document.querySelector('input[name="paid-by"]:checked').value;
-  const splitType = document.querySelector('input[name="split-type"]:checked').value;
+  const paidBy = isGroupMode()
+    ? document.querySelector('input[name="group-payer"]:checked')?.value
+    : document.querySelector('input[name="paid-by"]:checked').value;
+  const splitType = isGroupMode()
+    ? document.querySelector('input[name="group-split-type"]:checked')?.value
+    : document.querySelector('input[name="split-type"]:checked').value;
 
   let hasError = false;
   if (!description) { showFieldError('expense-desc', 'error-desc', '内容を入力してください'); hasError = true; }
@@ -969,12 +1130,42 @@ async function saveExpense() {
     }
   }
 
-  // ソロモードでは強制的に user1 / 100:0
-  if (isSoloMode()) {
-    splitUser1 = 100; splitUser2 = 0;
+  let data;
+  if (isGroupMode()) {
+    // グループモード: splits を計算
+    const members = appData.members || [];
+    let splits = {};
+    if (splitType === 'equal-all') {
+      const perPerson = Math.floor(amount / members.length);
+      const remainder = amount - (perPerson * members.length);
+      members.forEach((m, i) => { splits[m.id] = perPerson + (i < remainder ? 1 : 0); });
+    } else if (splitType === 'equal-select') {
+      const checked = [...$('group-split-checkboxes').querySelectorAll('input:checked')].map(cb => cb.value);
+      if (checked.length === 0) { showToast('負担する人を選んでください', { type: 'error' }); return; }
+      const perPerson = Math.floor(amount / checked.length);
+      const remainder = amount - (perPerson * checked.length);
+      checked.forEach((mid, i) => { splits[mid] = perPerson + (i < remainder ? 1 : 0); });
+    } else {
+      // custom
+      let customTotal = 0;
+      members.forEach(m => {
+        const val = parseInt(document.getElementById('group-custom-' + m.id)?.value, 10) || 0;
+        if (val > 0) splits[m.id] = val;
+        customTotal += val;
+      });
+      if (customTotal !== amount) {
+        showToast(`合計が金額と一致しません（差額: ${yen(Math.abs(amount - customTotal))}）`, { type: 'error' });
+        return;
+      }
+    }
+    data = { category: selectedCategory, description, amount, date, paidBy, splits };
+  } else {
+    // ソロモードでは強制的に user1 / 100:0
+    if (isSoloMode()) {
+      splitUser1 = 100; splitUser2 = 0;
+    }
+    data = { category: selectedCategory, description, amount, date, paidBy: isSoloMode() ? 'user1' : paidBy, splitUser1, splitUser2 };
   }
-
-  const data = { category: selectedCategory, description, amount, date, paidBy: isSoloMode() ? 'user1' : paidBy, splitUser1, splitUser2 };
 
   try {
     const group = groups.find(g => g.id === currentGroupId);
@@ -1043,6 +1234,175 @@ function updateSplitHint() {
     hint.textContent = `合計 ${sum}%（100%にしてください）`;
     hint.style.color = '#C0392B';
   }
+}
+
+// ==================== グループモード: 表示・フォーム ====================
+function renderGroupSummary() {
+  const s = calcGroupSummary();
+  $('group-ledger-total').textContent = yen(s.total);
+
+  const grid = $('group-members-grid');
+  grid.innerHTML = '';
+  s.balances.forEach(b => {
+    const el = document.createElement('div');
+    el.className = 'group-member-stat';
+    el.innerHTML = `
+      <span class="group-member-name">${escapeHtml(b.name)}</span>
+      <span class="group-member-sub">支払い済</span>
+      <span class="group-member-amount">${yen(b.paid)}</span>
+    `;
+    grid.appendChild(el);
+  });
+
+  const stEl = $('group-settlement');
+  const actionsEl = $('group-settlement-actions');
+  if (s.total === 0) {
+    stEl.innerHTML = '<span style="color:var(--ink-light)">まだ支出がありません</span>';
+    actionsEl.classList.add('hidden');
+  } else if (s.transfers.length === 0) {
+    stEl.innerHTML = '<span class="settlement-clear">&#10003; ぴったり精算済み</span>';
+    actionsEl.classList.add('hidden');
+  } else {
+    stEl.innerHTML = s.transfers.map(t =>
+      `<div class="group-transfer-row">
+        <strong>${escapeHtml(t.from)}</strong> → <strong>${escapeHtml(t.to)}</strong>
+        <span class="settlement-amount">${yen(t.amount)}</span>
+      </div>`
+    ).join('');
+    actionsEl.classList.remove('hidden');
+  }
+}
+
+function applyGroupFormMode() {
+  // ペアモード用セクションを非表示
+  const formGroups = $('expense-form').querySelectorAll(':scope > .form-group');
+  if (formGroups[4]) formGroups[4].classList.add('hidden'); // 支払った人(pair)
+  if (formGroups[5]) formGroups[5].classList.add('hidden'); // 負担割合(pair)
+  $('custom-split').classList.add('hidden');
+  $('full-split').classList.add('hidden');
+  // グループモード用セクションを表示
+  $('group-payer-section').classList.remove('hidden');
+  $('group-split-section').classList.remove('hidden');
+  $('group-split-select').classList.add('hidden');
+  $('group-split-custom').classList.add('hidden');
+  buildGroupPayerGrid();
+  buildGroupSplitCheckboxes();
+  const eqAll = document.querySelector('input[name="group-split-type"][value="equal-all"]');
+  if (eqAll) eqAll.checked = true;
+}
+
+function hideGroupFormSections() {
+  $('group-payer-section').classList.add('hidden');
+  $('group-split-section').classList.add('hidden');
+  $('group-split-select').classList.add('hidden');
+  $('group-split-custom').classList.add('hidden');
+  // ペアモード用セクションを再表示
+  const formGroups = $('expense-form').querySelectorAll(':scope > .form-group');
+  if (formGroups[4]) formGroups[4].classList.remove('hidden');
+  if (formGroups[5]) formGroups[5].classList.remove('hidden');
+}
+
+function buildGroupPayerGrid() {
+  const grid = $('group-payer-grid');
+  grid.innerHTML = '';
+  (appData.members || []).forEach((m, i) => {
+    const label = document.createElement('label');
+    label.className = 'payer-option';
+    label.innerHTML = `<input type="radio" name="group-payer" value="${m.id}" ${i === 0 ? 'checked' : ''}><span class="payer-label">${escapeHtml(m.name)}</span>`;
+    grid.appendChild(label);
+  });
+}
+
+function buildGroupSplitCheckboxes() {
+  const container = $('group-split-checkboxes');
+  container.innerHTML = '';
+  (appData.members || []).forEach(m => {
+    const label = document.createElement('label');
+    label.className = 'group-member-check checked';
+    label.innerHTML = `<input type="checkbox" value="${m.id}" checked><span>${escapeHtml(m.name)}</span>`;
+    const cb = label.querySelector('input');
+    cb.addEventListener('change', () => label.classList.toggle('checked', cb.checked));
+    container.appendChild(label);
+  });
+}
+
+function buildGroupCustomInputs() {
+  const list = $('group-split-custom-list');
+  list.innerHTML = '';
+  (appData.members || []).forEach(m => {
+    const row = document.createElement('div');
+    row.className = 'group-split-custom-row';
+    row.innerHTML = `<span class="split-name">${escapeHtml(m.name)}</span>
+      <div class="input-yen"><span class="yen-mark">¥</span><input type="number" id="group-custom-${m.id}" placeholder="0" min="0"></div>`;
+    list.appendChild(row);
+    row.querySelector('input').addEventListener('input', updateGroupSplitHint);
+  });
+}
+
+function updateGroupSplitVis() {
+  const type = document.querySelector('input[name="group-split-type"]:checked').value;
+  $('group-split-select').classList.toggle('hidden', type !== 'equal-select');
+  $('group-split-custom').classList.toggle('hidden', type !== 'custom');
+  if (type === 'custom') buildGroupCustomInputs();
+}
+
+function updateGroupSplitHint() {
+  const members = appData.members || [];
+  let total = 0;
+  members.forEach(m => {
+    total += parseInt(document.getElementById('group-custom-' + m.id)?.value, 10) || 0;
+  });
+  const hint = $('group-split-hint');
+  const expAmount = parseInt($('expense-amount').value, 10) || 0;
+  if (expAmount > 0 && total === expAmount) {
+    hint.textContent = `合計 ${yen(total)} ✓`;
+    hint.style.color = 'var(--sage)';
+  } else if (expAmount > 0) {
+    hint.textContent = `合計 ${yen(total)}（金額: ${yen(expAmount)}、差額: ${yen(Math.abs(expAmount - total))}）`;
+    hint.style.color = '#C0392B';
+  } else {
+    hint.textContent = `合計 ${yen(total)}`;
+    hint.style.color = 'var(--ink-light)';
+  }
+}
+
+function getGroupSettlementText() {
+  const s = calcGroupSummary();
+  if (s.total === 0) return '';
+  if (s.transfers.length === 0) return `${fmtMonth(currentMonth)}の清算：精算済み ✓`;
+  let text = `${fmtMonth(currentMonth)}の清算\n`;
+  s.transfers.forEach(t => { text += `${t.from} → ${t.to}: ${yen(t.amount)}\n`; });
+  text += `合計: ${yen(s.total)}`;
+  return text;
+}
+
+function shareGroupByLINE() {
+  const text = getGroupSettlementText();
+  if (!text) { showToast('清算情報がありません'); return; }
+  const url = `https://line.me/R/share?text=${encodeURIComponent(text)}`;
+  window.open(url, '_blank');
+}
+
+function renderSettingsMembers() {
+  const list = $('settings-members-list');
+  list.innerHTML = '';
+  (appData.members || []).forEach((m, i) => {
+    const row = document.createElement('div');
+    row.className = 'settings-member-row';
+    const canRemove = (appData.members.length > 3);
+    row.innerHTML = `<input type="text" class="settings-member-input" data-mid="${m.id}" value="${escapeHtml(m.name)}" maxlength="10" placeholder="メンバー${i + 1}">
+      ${canRemove ? `<button type="button" class="settings-member-remove" data-mid="${m.id}" title="削除">✕</button>` : ''}`;
+    list.appendChild(row);
+  });
+  list.querySelectorAll('.settings-member-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mid = btn.dataset.mid;
+      const hasExpenses = appData.expenses.some(e => e.paidBy === mid || (e.splits && e.splits[mid]));
+      if (hasExpenses) { showToast('支出があるメンバーは削除できません', { type: 'error' }); return; }
+      appData.members = appData.members.filter(m => m.id !== mid);
+      renderSettingsMembers();
+    });
+  });
 }
 
 // ==================== モーダル表示 ====================
@@ -1197,14 +1557,30 @@ async function logout() {
 function openSettings() {
   updateAuthUI();
   const solo = isSoloMode();
+  const groupMode = isGroupMode();
   $('settings-user1').value = appData.users.user1;
   $('settings-user2').value = appData.users.user2;
-  // ソロモードではふたりめフィールドを非表示
+  // グループモードではpair/soloのユーザーフィールドを非表示、メンバー管理を表示
+  const u1Group = $('settings-user1').closest('.form-group');
+  if (u1Group) u1Group.classList.toggle('hidden', groupMode);
   const u2Group = $('settings-user2-group');
-  if (u2Group) u2Group.classList.toggle('hidden', solo);
+  if (u2Group) u2Group.classList.toggle('hidden', solo || groupMode);
+  const groupMembersSection = $('settings-group-members');
+  if (groupMembersSection) groupMembersSection.classList.toggle('hidden', !groupMode);
+  if (groupMode) {
+    renderSettingsMembers();
+    // メンバー追加ボタン
+    const addBtn = $('settings-add-member');
+    addBtn.onclick = () => {
+      if ((appData.members || []).length >= 10) { showToast('メンバーは最大10人までです', { type: 'error' }); return; }
+      const newId = 'm' + (Date.now().toString(36));
+      appData.members.push({ id: newId, name: '' });
+      renderSettingsMembers();
+    };
+  }
   // ひとりめのラベルを切替
   const u1Label = $('settings-user1').previousElementSibling || $('settings-user1').parentElement.querySelector('label');
-  if (u1Label) u1Label.textContent = solo ? 'あなたの名前' : 'ひとりめの名前';
+  if (u1Label && !groupMode) u1Label.textContent = solo ? 'あなたの名前' : 'ひとりめの名前';
 
   const sgn = $('settings-group-name');
   if (sgn) sgn.value = appData.groupName || '';
@@ -1220,19 +1596,43 @@ function openSettings() {
 
 async function saveSettings() {
   const solo = isSoloMode();
-  const u1 = $('settings-user1').value.trim();
-  const u2 = solo ? '' : $('settings-user2').value.trim();
+  const groupMode = isGroupMode();
   const gn = $('settings-group-name') ? $('settings-group-name').value.trim() : '';
-  if (!u1 || (!solo && !u2)) { showToast('名前を入力してください', { type: 'error' }); return; }
+
+  if (groupMode) {
+    // グループモード: メンバー名を収集
+    const inputs = $('settings-members-list').querySelectorAll('.settings-member-input');
+    const updatedMembers = [];
+    let hasEmpty = false;
+    inputs.forEach(inp => {
+      const name = inp.value.trim();
+      const mid = inp.dataset.mid;
+      if (!name) hasEmpty = true;
+      updatedMembers.push({ id: mid, name });
+    });
+    if (hasEmpty) { showToast('メンバー名を入力してください', { type: 'error' }); return; }
+    appData.members = updatedMembers;
+  }
+
+  const u1 = groupMode ? '' : $('settings-user1').value.trim();
+  const u2 = (solo || groupMode) ? '' : $('settings-user2').value.trim();
+  if (!groupMode && !u1) { showToast('名前を入力してください', { type: 'error' }); return; }
+  if (!groupMode && !solo && !u2) { showToast('名前を入力してください', { type: 'error' }); return; }
 
   try {
     const group = groups.find(g => g.id === currentGroupId);
     if (USE_FIREBASE && db && group && group.roomCode) {
-      await db.collection('rooms').doc(group.roomCode).update({
-        users: { user1: u1, user2: u2 }
-      });
+      if (groupMode) {
+        await db.collection('rooms').doc(group.roomCode).update({
+          members: appData.members
+        });
+      } else {
+        await db.collection('rooms').doc(group.roomCode).update({
+          users: { user1: u1, user2: u2 }
+        });
+      }
     } else {
-      appData.users = { user1: u1, user2: u2 };
+      if (!groupMode) appData.users = { user1: u1, user2: u2 };
       saveLocal();
       syncNames();
       renderMonth();
@@ -1272,7 +1672,7 @@ function resetRoom() {
       saveGroups();
     }
     currentGroupId = null;
-    appData = { users: { user1: '', user2: '' }, expenses: [], groupName: '' };
+    appData = { users: { user1: '', user2: '' }, members: [], expenses: [], groupName: '' };
     hideModal($('confirm-dialog'));
     hideModal($('settings-modal'));
     showHomeScreen();
@@ -1408,11 +1808,14 @@ function setupEvents() {
     showSetupStep('step-loading');
     try {
       const result = await joinRoom(code);
+      const joinMode = result.mode || 'pair';
       const groupId = uid();
-      const newGroup = { id: groupId, name: groupName || 'グループ', roomCode: result.code, archived: false, createdAt: Date.now(), mode: 'pair' };
+      const newGroup = { id: groupId, name: groupName || 'グループ', roomCode: result.code, archived: false, createdAt: Date.now(), mode: joinMode };
       groups.push(newGroup);
       saveGroups();
-      const gData = { users: result.users, expenses: [], groupName: groupName || 'グループ' };
+      const gData = joinMode === 'group'
+        ? { users: { user1: '', user2: '' }, members: result.members || [], expenses: [], groupName: groupName || 'グループ' }
+        : { users: result.users, members: [], expenses: [], groupName: groupName || 'グループ' };
       saveGroupData(groupId, gData);
 
       currentGroupId = groupId;
@@ -1487,6 +1890,101 @@ function setupEvents() {
     openGroup(groupId);
   });
   $('btn-back-local-solo').addEventListener('click', () => showSetupStep('step-mode'));
+
+  // === セットアップ: グループモード ===
+  $('btn-mode-group').addEventListener('click', () => {
+    pendingMode = 'group';
+    if (USE_FIREBASE && db) {
+      showSetupStep('step-group-choice');
+    } else {
+      showSetupStep('step-local-group');
+    }
+  });
+  $('btn-to-group-create').addEventListener('click', () => showSetupStep('step-group-create'));
+  $('btn-to-group-join').addEventListener('click', () => showSetupStep('step-join'));
+  $('btn-back-group-choice').addEventListener('click', () => showSetupStep('step-mode'));
+  $('btn-back-group-create').addEventListener('click', () => {
+    if (USE_FIREBASE && db) showSetupStep('step-group-choice');
+    else showSetupStep('step-mode');
+  });
+  $('btn-back-local-group').addEventListener('click', () => showSetupStep('step-mode'));
+
+  // メンバー追加ボタン
+  function setupAddMemberBtn(btnId, containerId) {
+    $(btnId).addEventListener('click', () => {
+      const container = $(containerId);
+      const count = container.querySelectorAll('input').length;
+      if (count >= 10) { showToast('メンバーは最大10人までです', { type: 'error' }); return; }
+      const field = document.createElement('div');
+      field.className = 'setup-field group-member-field';
+      field.innerHTML = `<input type="text" placeholder="メンバー${count + 1}の名前" maxlength="10"><button type="button" class="member-remove-btn" title="削除">✕</button>`;
+      container.appendChild(field);
+      field.querySelector('.member-remove-btn').addEventListener('click', () => {
+        if (container.querySelectorAll('input').length > 3) field.remove();
+      });
+    });
+  }
+  setupAddMemberBtn('btn-add-member', 'group-members-inputs');
+  setupAddMemberBtn('btn-add-local-member', 'local-group-members-inputs');
+
+  // グループ作成ヘルパー
+  function collectGroupMembers(containerId) {
+    const inputs = $(containerId).querySelectorAll('input');
+    const names = [];
+    inputs.forEach(inp => { const n = inp.value.trim(); if (n) names.push(n); });
+    return names;
+  }
+
+  // Firebase グループ作成
+  $('btn-create-group-room').addEventListener('click', async () => {
+    const groupName = $('group-mode-name-input').value.trim() || 'グループ';
+    const names = collectGroupMembers('group-members-inputs');
+    if (names.length < 3) { showToast('3人以上のメンバー名を入力してください', { type: 'error' }); return; }
+    const members = names.map((n, i) => ({ id: 'm' + (i + 1), name: n }));
+    showSetupStep('step-loading');
+    try {
+      const code = await createGroupRoom(members);
+      const groupId = uid();
+      const newGroup = { id: groupId, name: groupName, roomCode: code, archived: false, createdAt: Date.now(), mode: 'group' };
+      groups.push(newGroup);
+      saveGroups();
+      const gData = { users: { user1: '', user2: '' }, members, expenses: [], groupName };
+      saveGroupData(groupId, gData);
+      currentGroupId = groupId;
+      appData = gData;
+      $('display-code').textContent = code;
+      showSetupStep('step-code');
+    } catch (e) {
+      console.error(e);
+      showToast('作成に失敗しました。ネットワークを確認してください', { type: 'error' });
+      showSetupStep('step-group-create');
+    }
+  });
+
+  // ローカル グループ作成
+  $('btn-create-local-group').addEventListener('click', () => {
+    const groupName = $('local-group-mode-name').value.trim() || 'グループ';
+    const names = collectGroupMembers('local-group-members-inputs');
+    if (names.length < 3) { showToast('3人以上のメンバー名を入力してください', { type: 'error' }); return; }
+    const members = names.map((n, i) => ({ id: 'm' + (i + 1), name: n }));
+    const groupId = uid();
+    const newGroup = { id: groupId, name: groupName, roomCode: '', archived: false, createdAt: Date.now(), mode: 'group' };
+    groups.push(newGroup);
+    saveGroups();
+    const gData = { users: { user1: '', user2: '' }, members, expenses: [], groupName };
+    saveGroupData(groupId, gData);
+    currentGroupId = groupId;
+    appData = gData;
+    openGroup(groupId);
+  });
+
+  // グループモード: 割合切替
+  document.querySelectorAll('input[name="group-split-type"]').forEach(r =>
+    r.addEventListener('change', updateGroupSplitVis)
+  );
+
+  // グループモード: LINE共有
+  $('btn-group-line-share').addEventListener('click', shareGroupByLINE);
 
   // === タブ ===
   document.querySelectorAll('.tab-btn').forEach(btn => {

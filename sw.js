@@ -1,5 +1,5 @@
 // ふたりの割り勘帳 — Service Worker
-const CACHE_NAME = 'warikan-v11';
+const CACHE_NAME = 'warikan-v12';
 const ASSETS = [
   './',
   './index.html',

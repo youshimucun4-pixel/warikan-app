@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>割り勘帳 アイコン生成ツール</title>
+  <style>
+    body { font-family: sans-serif; padding: 32px; background: #f5f0e8; }
+    h1 { font-size: 20px; margin-bottom: 16px; }
+    .icons { display: flex; flex-wrap: wrap; gap: 16px; }
+    .icon-item { text-align: center; }
+    .icon-item canvas { border: 1px solid #ccc; border-radius: 8px; }
+    .icon-item p { font-size: 12px; margin-top: 4px; }
+    a { display: inline-block; margin-top: 4px; font-size: 11px; color: #C65D3E; }
+  </style>
+</head>
+<body>
+  <h1>割り勘帳 アイコン生成ツール</h1>
+  <p>各アイコンの「ダウンロード」リンクをクリックして icons/ フォルダに保存してください。</p>
+  <div class="icons" id="icons"></div>
+  <script>
+    const SIZES = [48, 72, 96, 128, 144, 152, 180, 192, 384, 512];
+    const container = document.getElementById('icons');
+
+    function drawIcon(size, maskable) {
+      const c = document.createElement('canvas');
+      c.width = size; c.height = size;
+      const ctx = c.getContext('2d');
+      const s = size;
+
+      ctx.fillStyle = '#F5F0E8';
+      if (maskable) {
+        ctx.fillRect(0, 0, s, s);
+      } else {
+        ctx.beginPath();
+        ctx.roundRect(0, 0, s, s, s * 0.22);
+        ctx.fill();
+      }
+
+      ctx.strokeStyle = 'rgba(198,93,62,.3)';
+      ctx.lineWidth = Math.max(1.5, s * 0.007);
+      ctx.beginPath();
+      ctx.arc(s/2, s/2, s*0.38, 0, Math.PI*2);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#C65D3E';
+      ctx.lineWidth = Math.max(3, s * 0.018);
+      ctx.beginPath();
+      ctx.arc(s/2, s/2, s*0.32, 0, Math.PI*2);
+      ctx.stroke();
+
+      ctx.fillStyle = '#C65D3E';
+      ctx.font = `700 ${Math.round(s*0.37)}px serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('\u5272', s/2, s/2 + s*0.01);
+
+      return c;
+    }
+
+    SIZES.forEach(size => {
+      const item = document.createElement('div');
+      item.className = 'icon-item';
+      const c = drawIcon(size, false);
+      const displaySize = Math.min(size, 128);
+      c.style.width = displaySize + 'px';
+      c.style.height = displaySize + 'px';
+      item.appendChild(c);
+      item.innerHTML += `<p>${size}x${size}</p>`;
+      const a = document.createElement('a');
+      a.href = c.toDataURL('image/png');
+      a.download = `icon-${size}.png`;
+      a.textContent = 'DL';
+      item.appendChild(a);
+      container.appendChild(item);
+    });
+
+    [192, 512].forEach(size => {
+      const item = document.createElement('div');
+      item.className = 'icon-item';
+      const c = drawIcon(size, true);
+      const displaySize = Math.min(size, 128);
+      c.style.width = displaySize + 'px';
+      c.style.height = displaySize + 'px';
+      item.appendChild(c);
+      item.innerHTML += `<p>maskable ${size}x${size}</p>`;
+      const a = document.createElement('a');
+      a.href = c.toDataURL('image/png');
+      a.download = `icon-maskable-${size}.png`;
+      a.textContent = 'DL';
+      item.appendChild(a);
+      container.appendChild(item);
+    });
+  </script>
+</body>
+</html>

@@ -2171,6 +2171,219 @@ body {
   margin-top: 10px;
 }
 
+/* ============================================
+   GROUP MODE
+   ============================================ */
+/* ペアモードレジャーをグループ時に非表示 */
+.group-mode .ledger:not(.group-ledger) {
+  display: none;
+}
+.group-mode .group-ledger {
+  display: block !important;
+}
+
+/* メンバーグリッド（支払い済み表示） */
+.group-members-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 6px;
+  padding: 12px 0;
+}
+.group-member-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 8px 4px;
+}
+.group-member-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80px;
+}
+.group-member-sub {
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+.group-member-amount {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--ink);
+  font-family: var(--ff-sans);
+}
+
+/* 清算送金行 */
+.group-settlement {
+  padding: 8px 0;
+  text-align: center;
+}
+.group-transfer-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 0;
+  font-size: 13px;
+  color: var(--ink-mid);
+  font-family: var(--ff-sans);
+}
+.group-transfer-row .settlement-amount {
+  font-weight: 700;
+  color: var(--terracotta-deep);
+}
+
+/* 支払者選択グリッド（最大10人対応） */
+.group-payer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 6px;
+}
+.group-payer-grid .payer-option {
+  min-width: 0;
+}
+.group-payer-grid .payer-label {
+  padding: 8px 4px;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* メンバーチェックボックス（選んで均等時） */
+.group-member-checkboxes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 6px;
+}
+.group-member-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all var(--transition);
+  font-family: var(--ff-sans);
+}
+.group-member-check input { display: none; }
+.group-member-check span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.group-member-check.checked {
+  border-color: var(--terracotta);
+  background: var(--terracotta-pale);
+  color: var(--terracotta-deep);
+  font-weight: 600;
+}
+
+/* カスタム金額入力 */
+.group-split-custom-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.group-split-custom-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.group-split-custom-row .split-name {
+  flex: 0 0 60px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.group-split-custom-row .input-yen {
+  flex: 1;
+}
+
+/* セットアップ：メンバー入力欄 */
+.group-members-inputs {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.group-member-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.group-member-field input {
+  flex: 1;
+}
+.member-remove-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: none;
+  color: var(--ink-light);
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
+}
+.member-remove-btn:hover {
+  color: #C0392B;
+  background: rgba(192, 57, 43, .08);
+}
+
+/* ホーム画面：グループバッジ */
+.group-card-group {
+  border-left-color: #D4854A !important;
+}
+.group-badge {
+  color: #D4854A;
+}
+
+/* 設定：メンバーリスト */
+.settings-members-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.settings-member-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.settings-member-row input {
+  flex: 1;
+}
+.settings-member-remove {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: none;
+  color: var(--ink-light);
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.settings-member-remove:hover {
+  color: #C0392B;
+  background: rgba(192, 57, 43, .08);
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
