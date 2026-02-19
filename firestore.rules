@@ -18,10 +18,10 @@ service cloud.firestore {
            && request.resource.data.users.user1 is string
            && request.resource.data.users.user2 is string)
           ||
-          // グループモード（新規: 3-10人）
+          // グループモード（新規: 1-10人）
           (request.resource.data.mode == 'group'
            && request.resource.data.members is list
-           && request.resource.data.members.size() >= 3
+           && request.resource.data.members.size() >= 1
            && request.resource.data.members.size() <= 10)
         );
 
@@ -39,6 +39,24 @@ service cloud.firestore {
         allow read, write: if request.auth != null
           && request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomCode)).data.memberUids;
       }
+    }
+
+    // 10分有効の招待リンク
+    match /invites/{inviteToken} {
+
+      // 認証済みユーザーのみ。期限切れのリンクは読み取り不可
+      allow read: if request.auth != null
+        && request.time < resource.data.expiresAt;
+
+      // 作成: 認証済み、作成者本人、11分以内の有効期限
+      allow create: if request.auth != null
+        && request.resource.data.roomCode is string
+        && request.resource.data.createdByUid == request.auth.uid
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt < request.time + duration.value(11, 'm');
+
+      allow update, delete: if false;
     }
 
     // その他のコレクションはすべて拒否

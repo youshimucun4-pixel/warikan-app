@@ -28,11 +28,15 @@ if (USE_FIREBASE) {
     db = firebase.firestore();
     db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
     auth = firebase.auth();
-    auth.onAuthStateChanged(user => {
+    auth.onAuthStateChanged(async user => {
       currentAuthUser = user;
       updateAuthUI();
       // ログイン済みならホーム画面へ、未ログインなら最初の画面（登録から）へ
       if (user) {
+        if (pendingInviteToken) {
+          await startInviteJoinFlow(pendingInviteToken);
+          return;
+        }
         showHomeScreen();
       } else {
         showStartScreen();
@@ -63,6 +67,7 @@ function getCategoryById(id) {
 // ==================== 定数・グローバル状態 ====================
 const GROUPS_KEY = 'warikan-groups';
 const MAX_GROUPS = 3;
+const INVITE_TTL_MS = 10 * 60 * 1000;
 
 let groups = [];
 let currentGroupId = null;
@@ -77,6 +82,7 @@ let currentTab = 'record';
 let trendCategoryFilter = 'all';
 let actionGroupId = null;
 let pendingMode = 'pair'; // 'solo' | 'pair' — セットアップ中の選択を保持
+let pendingInviteToken = null;
 
 // ==================== DOM ====================
 const $ = id => document.getElementById(id);
@@ -133,6 +139,27 @@ function generateRoomCode() {
   let code = '';
   for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
   return code;
+}
+
+function generateInviteToken() {
+  const bytes = new Uint8Array(16);
+  if (window.crypto && window.crypto.getRandomValues) {
+    window.crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function getInviteTokenFromUrl() {
+  const params = new URLSearchParams(window.location.search || '');
+  return params.get('invite') || '';
+}
+
+function clearInviteTokenFromUrl() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('invite');
+  history.replaceState(null, '', url.pathname + (url.search ? url.search : '') + (url.hash || ''));
 }
 
 async function copyToClipboard(text) {
@@ -210,14 +237,15 @@ function calcMinTransfers(balances) {
 }
 
 // ==================== グループモード: Firestore ルーム作成 ====================
-async function createGroupRoom(members) {
+async function createGroupRoom(ownerName) {
   const code = generateRoomCode();
   const ref = db.collection('rooms').doc(code);
   const existing = await ref.get();
-  if (existing.exists) return createGroupRoom(members);
+  if (existing.exists) return createGroupRoom(ownerName);
+  const creatorId = 'm' + uid();
   await ref.set({
     mode: 'group',
-    members: members,
+    members: [{ id: creatorId, name: ownerName, uid: currentAuthUser.uid }],
     memberUids: [currentAuthUser.uid],
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   });
@@ -291,7 +319,7 @@ function showStartScreen() {
 }
 
 function showSetupStep(stepId) {
-  ['step-mode', 'step-choice', 'step-create', 'step-code', 'step-join', 'step-loading', 'step-local', 'step-solo-create', 'step-local-solo', 'step-group-create', 'step-group-choice', 'step-local-group']
+  ['step-mode', 'step-choice', 'step-create', 'step-code', 'step-join', 'step-loading', 'step-local', 'step-solo-create', 'step-local-solo', 'step-group-create', 'step-group-choice', 'step-local-group', 'step-invite-name']
     .forEach(k => { const el = $(k); if (el) el.classList.add('hidden'); });
   $(stepId).classList.remove('hidden');
 }
@@ -319,42 +347,127 @@ async function createRoom(user1) {
 }
 
 async function joinRoom(code, userName) {
-  const upperCode = code.toUpperCase().trim();
+  const upperCode = (code || '').toUpperCase().trim();
+  const normalizedName = (userName || '').trim();
   const roomRef = db.collection('rooms').doc(upperCode);
-  const snap = await roomRef.get();
-  if (!snap.exists) throw new Error('ルームが見つかりません。合言葉を確認してください');
+  let finalRoomData = null;
 
-  const roomData = snap.data();
-  const updates = {};
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(roomRef);
+    if (!snap.exists) throw new Error('ルームが見つかりません。合言葉を確認してください');
 
-  // 参加者のUIDをメンバーリストに追加
-  if (currentAuthUser) {
-    updates.memberUids = firebase.firestore.FieldValue.arrayUnion(currentAuthUser.uid);
-  }
+    const roomData = snap.data();
+    const updates = {};
 
-  // ふたりモードは、参加者本人が入力した名前で未設定側を埋める
-  if (roomData.mode !== 'group' && userName) {
-    const users = roomData.users || { user1: '', user2: '' };
-    const normalized = userName.trim();
-    if (normalized) {
+    if (currentAuthUser) {
+      updates.memberUids = firebase.firestore.FieldValue.arrayUnion(currentAuthUser.uid);
+    }
+
+    if (roomData.mode === 'group') {
+      if (!normalizedName) throw new Error('あなたの名前を入力してください');
+      const members = Array.isArray(roomData.members) ? [...roomData.members] : [];
+      const joined = currentAuthUser
+        ? members.some(m => m && m.uid === currentAuthUser.uid)
+        : false;
+      if (!joined) {
+        if (members.length >= 10) throw new Error('このグループは満員です（最大10人）');
+        members.push({
+          id: 'm' + uid(),
+          name: normalizedName,
+          uid: currentAuthUser ? currentAuthUser.uid : null
+        });
+        updates.members = members;
+        roomData.members = members;
+      }
+    } else if (normalizedName) {
+      const users = roomData.users || { user1: '', user2: '' };
       let nextUsers = null;
       if (!users.user1) {
-        nextUsers = { ...users, user1: normalized };
+        nextUsers = { ...users, user1: normalizedName };
       } else if (!users.user2) {
-        nextUsers = { ...users, user2: normalized };
+        nextUsers = { ...users, user2: normalizedName };
       }
       if (nextUsers) {
         updates.users = nextUsers;
         roomData.users = nextUsers;
       }
     }
-  }
 
-  if (Object.keys(updates).length > 0) {
-    await roomRef.update(updates);
-  }
+    if (Object.keys(updates).length > 0) {
+      tx.update(roomRef, updates);
+    }
+    finalRoomData = roomData;
+  });
 
-  return { code: upperCode, users: roomData.users, members: roomData.members, mode: roomData.mode };
+  return { code: upperCode, users: finalRoomData.users, members: finalRoomData.members, mode: finalRoomData.mode };
+}
+
+async function createInviteLink(roomCode) {
+  if (!db || !currentAuthUser) throw new Error('ログインしてから招待リンクを作成してください');
+  const token = generateInviteToken();
+  const expiresAt = firebase.firestore.Timestamp.fromMillis(Date.now() + INVITE_TTL_MS);
+  await db.collection('invites').doc(token).set({
+    roomCode,
+    createdByUid: currentAuthUser.uid,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    expiresAt
+  });
+  return `${window.location.origin}${window.location.pathname}?invite=${encodeURIComponent(token)}`;
+}
+
+async function resolveInviteToken(token) {
+  if (!db) throw new Error('招待リンクは現在利用できません');
+  const normalized = (token || '').trim();
+  if (!normalized) throw new Error('招待リンクが無効です');
+  const snap = await db.collection('invites').doc(normalized).get();
+  if (!snap.exists) throw new Error('招待リンクが見つかりません');
+  const data = snap.data();
+  const expiresMs = data && data.expiresAt && data.expiresAt.toMillis ? data.expiresAt.toMillis() : 0;
+  if (!expiresMs || Date.now() > expiresMs) throw new Error('招待リンクの有効期限が切れています');
+  if (!data.roomCode) throw new Error('招待リンクが無効です');
+  return data;
+}
+
+function upsertJoinedGroup(result, preferredName) {
+  const joinMode = result.mode || 'pair';
+  let group = groups.find(g => g.roomCode === result.code);
+  if (!group) {
+    group = {
+      id: uid(),
+      name: preferredName || 'グループ',
+      roomCode: result.code,
+      archived: false,
+      createdAt: Date.now(),
+      mode: joinMode
+    };
+    groups.push(group);
+  } else if (preferredName) {
+    group.name = preferredName;
+  }
+  saveGroups();
+
+  const gData = joinMode === 'group'
+    ? { users: { user1: '', user2: '' }, members: result.members || [], expenses: [], groupName: group.name || 'グループ' }
+    : { users: result.users || { user1: '', user2: '' }, members: [], expenses: [], groupName: group.name || 'グループ' };
+  saveGroupData(group.id, gData);
+  currentGroupId = group.id;
+  appData = gData;
+  openGroup(group.id);
+}
+
+async function startInviteJoinFlow(token) {
+  if (!currentAuthUser) return;
+  try {
+    await resolveInviteToken(token);
+    showScreen('setup-screen');
+    showSetupStep('step-invite-name');
+  } catch (e) {
+    console.error('Invite flow error:', e);
+    showToast(e.message || '招待リンクを開けませんでした', { type: 'error' });
+    pendingInviteToken = null;
+    clearInviteTokenFromUrl();
+    showHomeScreen();
+  }
 }
 
 function startListening() {
@@ -403,6 +516,11 @@ function stopListening() {
 // ==================== 初期化 ====================
 async function initApp() {
   groups = loadGroups();
+  pendingInviteToken = getInviteTokenFromUrl();
+  if (pendingInviteToken && currentAuthUser) {
+    await startInviteJoinFlow(pendingInviteToken);
+    return;
+  }
   // Firebase 認証がない環境ではそのままホームへ。ある場合は最初に登録画面を表示し、onAuthStateChanged でログイン済みならホームへ
   if (!USE_FIREBASE || !auth) {
     showHomeScreen();
@@ -1629,11 +1747,18 @@ async function saveSettings() {
     const inputs = $('settings-members-list').querySelectorAll('.settings-member-input');
     const updatedMembers = [];
     let hasEmpty = false;
+    const beforeById = {};
+    (appData.members || []).forEach(m => { beforeById[m.id] = m; });
     inputs.forEach(inp => {
       const name = inp.value.trim();
       const mid = inp.dataset.mid;
       if (!name) hasEmpty = true;
-      updatedMembers.push({ id: mid, name });
+      const prev = beforeById[mid] || {};
+      updatedMembers.push({
+        id: mid,
+        name,
+        ...(prev.uid ? { uid: prev.uid } : {})
+      });
     });
     if (hasEmpty) { showToast('メンバー名を入力してください', { type: 'error' }); return; }
     appData.members = updatedMembers;
@@ -1814,9 +1939,31 @@ function setupEvents() {
     const group = groups.find(g => g.id === currentGroupId);
     if (group) copyToClipboard(group.roomCode);
   });
+  $('btn-copy-invite-link').addEventListener('click', async () => {
+    const group = groups.find(g => g.id === currentGroupId);
+    if (!group || !group.roomCode) { showToast('同期グループでのみ利用できます', { type: 'error' }); return; }
+    try {
+      const inviteUrl = await createInviteLink(group.roomCode);
+      await copyToClipboard(inviteUrl);
+    } catch (e) {
+      console.error(e);
+      showToast(e.message || '招待リンクの作成に失敗しました', { type: 'error' });
+    }
+  });
   $('settings-copy-code').addEventListener('click', () => {
     const group = groups.find(g => g.id === currentGroupId);
     if (group) copyToClipboard(group.roomCode);
+  });
+  $('settings-copy-invite-link').addEventListener('click', async () => {
+    const group = groups.find(g => g.id === currentGroupId);
+    if (!group || !group.roomCode) { showToast('同期グループでのみ利用できます', { type: 'error' }); return; }
+    try {
+      const inviteUrl = await createInviteLink(group.roomCode);
+      await copyToClipboard(inviteUrl);
+    } catch (e) {
+      console.error(e);
+      showToast(e.message || '招待リンクの作成に失敗しました', { type: 'error' });
+    }
   });
 
   // はじめる
@@ -1834,19 +1981,7 @@ function setupEvents() {
     showSetupStep('step-loading');
     try {
       const result = await joinRoom(code, joinUserName);
-      const joinMode = result.mode || 'pair';
-      const groupId = uid();
-      const newGroup = { id: groupId, name: groupName || 'グループ', roomCode: result.code, archived: false, createdAt: Date.now(), mode: joinMode };
-      groups.push(newGroup);
-      saveGroups();
-      const gData = joinMode === 'group'
-        ? { users: { user1: '', user2: '' }, members: result.members || [], expenses: [], groupName: groupName || 'グループ' }
-        : { users: result.users, members: [], expenses: [], groupName: groupName || 'グループ' };
-      saveGroupData(groupId, gData);
-
-      currentGroupId = groupId;
-      appData = gData;
-      openGroup(groupId);
+      upsertJoinedGroup(result, groupName || 'グループ');
       showToast('参加しました！', { type: 'success' });
     } catch (e) {
       console.error(e);
@@ -1937,7 +2072,10 @@ function setupEvents() {
 
   // メンバー追加ボタン
   function setupAddMemberBtn(btnId, containerId) {
-    $(btnId).addEventListener('click', () => {
+    const btn = $(btnId);
+    const container = $(containerId);
+    if (!btn || !container) return;
+    btn.addEventListener('click', () => {
       const container = $(containerId);
       const count = container.querySelectorAll('input').length;
       if (count >= 10) { showToast('メンバーは最大10人までです', { type: 'error' }); return; }
@@ -1964,16 +2102,16 @@ function setupEvents() {
   // Firebase グループ作成
   $('btn-create-group-room').addEventListener('click', async () => {
     const groupName = $('group-mode-name-input').value.trim() || 'グループ';
-    const names = collectGroupMembers('group-members-inputs');
-    if (names.length < 3) { showToast('3人以上のメンバー名を入力してください', { type: 'error' }); return; }
-    const members = names.map((n, i) => ({ id: 'm' + (i + 1), name: n }));
+    const ownerName = $('group-owner-name').value.trim();
+    if (!ownerName) { showToast('あなたの名前を入力してください', { type: 'error' }); return; }
     showSetupStep('step-loading');
     try {
-      const code = await createGroupRoom(members);
+      const code = await createGroupRoom(ownerName);
       const groupId = uid();
       const newGroup = { id: groupId, name: groupName, roomCode: code, archived: false, createdAt: Date.now(), mode: 'group' };
       groups.push(newGroup);
       saveGroups();
+      const members = [{ id: 'm-local-owner', name: ownerName, uid: currentAuthUser ? currentAuthUser.uid : null }];
       const gData = { users: { user1: '', user2: '' }, members, expenses: [], groupName };
       saveGroupData(groupId, gData);
       currentGroupId = groupId;
@@ -1985,6 +2123,32 @@ function setupEvents() {
       showToast('作成に失敗しました。ネットワークを確認してください', { type: 'error' });
       showSetupStep('step-group-create');
     }
+  });
+
+  // 招待リンクから参加（コード不要）
+  $('btn-invite-join').addEventListener('click', async () => {
+    const groupName = $('invite-group-name') ? $('invite-group-name').value.trim() : '';
+    const userName = $('invite-user-name') ? $('invite-user-name').value.trim() : '';
+    if (!pendingInviteToken) { showToast('招待リンクが見つかりません', { type: 'error' }); return; }
+    if (!userName) { showToast('あなたの名前を入力してください', { type: 'error' }); return; }
+    showSetupStep('step-loading');
+    try {
+      const invite = await resolveInviteToken(pendingInviteToken);
+      const result = await joinRoom(invite.roomCode, userName);
+      upsertJoinedGroup(result, groupName || 'グループ');
+      pendingInviteToken = null;
+      clearInviteTokenFromUrl();
+      showToast('参加しました！', { type: 'success' });
+    } catch (e) {
+      console.error(e);
+      showToast(e.message || '参加に失敗しました', { type: 'error' });
+      showSetupStep('step-invite-name');
+    }
+  });
+  $('btn-invite-cancel').addEventListener('click', () => {
+    pendingInviteToken = null;
+    clearInviteTokenFromUrl();
+    showHomeScreen();
   });
 
   // ローカル グループ作成
