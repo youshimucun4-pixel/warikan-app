@@ -104,8 +104,8 @@
             <div class="onboard-step">
               <div class="onboard-step-num">3</div>
               <div class="onboard-step-body">
-                <h3>かんたん清算</h3>
-                <p>誰が誰にいくら払えばいいか一目瞭然</p>
+                <h3>分析・清算</h3>
+                <p>支出の傾向を分析、割り勘なら清算も</p>
               </div>
             </div>
           </div>
@@ -130,13 +130,31 @@
         <div class="setup-stamp">割</div>
         <h1 class="setup-title">割り勘帳</h1>
 
+        <!-- ステップ: モード選択（個人 or ふたり） -->
+        <div id="step-mode" class="setup-step hidden">
+          <p class="setup-desc">使い方を選んでください</p>
+          <div class="setup-form">
+            <button id="btn-mode-solo" class="mode-choice-btn">
+              <span class="mode-choice-icon">📒</span>
+              <span class="mode-choice-label">個人で使う</span>
+              <span class="mode-choice-desc">ひとりの家計簿として</span>
+            </button>
+            <button id="btn-mode-pair" class="mode-choice-btn">
+              <span class="mode-choice-icon">👥</span>
+              <span class="mode-choice-label">ふたりで使う</span>
+              <span class="mode-choice-desc">割り勘・建て替え管理</span>
+            </button>
+            <button type="button" id="btn-mode-back" class="btn-link hidden">&larr; ホームに戻る</button>
+          </div>
+        </div>
+
         <!-- ステップ: 選択 (Firebase モード) -->
         <div id="step-choice" class="setup-step hidden">
           <p class="setup-desc">グループを作って<br>共有しましょう</p>
           <div class="setup-form">
             <button id="btn-to-create" class="btn btn-warm btn-block">新しいグループをつくる</button>
             <button id="btn-to-join" class="btn btn-outline btn-block">グループに参加する</button>
-            <button type="button" id="btn-setup-back" class="btn-link hidden">&larr; ホームに戻る</button>
+            <button type="button" id="btn-setup-back" class="btn-link">&larr; もどる</button>
           </div>
         </div>
 
@@ -195,6 +213,39 @@
           <p class="setup-desc">接続中...</p>
         </div>
 
+        <!-- ステップ: ソロ作成 (Firebase有り) -->
+        <div id="step-solo-create" class="setup-step hidden">
+          <p class="setup-desc">個人の家計簿をつくりましょう</p>
+          <div class="setup-form">
+            <div class="setup-field">
+              <input type="text" id="solo-group-name" placeholder="グループ名（例：家計簿）" maxlength="20">
+            </div>
+            <div class="setup-divider"></div>
+            <div class="setup-field">
+              <input type="text" id="solo-user-name" placeholder="あなたの名前" maxlength="10">
+            </div>
+            <button id="btn-solo-create" class="btn btn-warm btn-block">つくる</button>
+            <button type="button" id="btn-back-solo" class="btn-link">&larr; もどる</button>
+          </div>
+        </div>
+
+        <!-- ステップ: ローカルモード — ソロ (Firebase未設定) -->
+        <div id="step-local-solo" class="setup-step hidden">
+          <p class="setup-desc">個人の家計簿をつくりましょう</p>
+          <div class="setup-form">
+            <div class="setup-field">
+              <input type="text" id="local-solo-group-name" placeholder="グループ名（例：家計簿）" maxlength="20">
+            </div>
+            <div class="setup-divider"></div>
+            <div class="setup-field">
+              <input type="text" id="local-solo-user-name" placeholder="あなたの名前" maxlength="10">
+            </div>
+            <button id="local-solo-start-btn" class="btn btn-warm btn-block">はじめる</button>
+            <button type="button" id="btn-back-local-solo" class="btn-link">&larr; もどる</button>
+            <p class="setup-hint">※ オフラインモード（同期なし）</p>
+          </div>
+        </div>
+
         <!-- ステップ: ローカルモード (Firebase未設定) -->
         <div id="step-local" class="setup-step hidden">
           <p class="setup-desc">グループの情報を入力して<br>はじめましょう</p>
@@ -211,7 +262,7 @@
               <input type="text" id="local-user2" placeholder="ふたりめの名前" maxlength="10">
             </div>
             <button id="local-start-btn" class="btn btn-warm btn-block">はじめる</button>
-            <button type="button" id="btn-setup-back-local" class="btn-link hidden">&larr; ホームに戻る</button>
+            <button type="button" id="btn-setup-back-local" class="btn-link">&larr; もどる</button>
             <p class="setup-hint">※ オフラインモード（同期なし）</p>
           </div>
         </div>
@@ -462,7 +513,7 @@
             <label for="settings-user1">ひとりめの名前</label>
             <input type="text" id="settings-user1" maxlength="10">
           </div>
-          <div class="form-group">
+          <div class="form-group" id="settings-user2-group">
             <label for="settings-user2">ふたりめの名前</label>
             <input type="text" id="settings-user2" maxlength="10">
           </div>

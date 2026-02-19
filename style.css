@@ -2102,6 +2102,75 @@ body {
   font-size: 15px;
 }
 
+/* ============================================
+   SOLO MODE
+   ============================================ */
+/* メイン画面がソロモードのとき */
+.solo-mode .ledger-people {
+  grid-template-columns: 1fr;
+}
+.solo-mode .ledger-person:nth-child(2) {
+  display: none;
+}
+.solo-mode .ledger-person:first-child {
+  border-right: none;
+}
+.solo-mode .ledger-settlement {
+  display: none;
+}
+.solo-mode .settlement-actions {
+  display: none !important;
+}
+
+/* ソログループカード */
+.group-card-solo {
+  border-left-color: var(--slate) !important;
+}
+
+/* モード選択ボタン */
+.mode-choice-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--paper);
+  cursor: pointer;
+  transition: all .2s ease;
+  text-align: left;
+  font-family: var(--ff-sans);
+}
+.mode-choice-btn:hover {
+  border-color: var(--terracotta);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+.mode-choice-btn:active {
+  transform: scale(.98);
+  transition-duration: .08s;
+}
+.mode-choice-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+.mode-choice-label {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.mode-choice-desc {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-light);
+  margin-top: 2px;
+}
+.mode-choice-btn + .mode-choice-btn {
+  margin-top: 10px;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
