@@ -304,31 +304,56 @@ function saveLocal() {
 }
 
 // ==================== Firebase ルーム操作 ====================
-async function createRoom(user1, user2) {
+async function createRoom(user1) {
   const code = generateRoomCode();
   const ref = db.collection('rooms').doc(code);
   const existing = await ref.get();
-  if (existing.exists) return createRoom(user1, user2);
+  if (existing.exists) return createRoom(user1);
 
   await ref.set({
-    users: { user1, user2 },
+    users: { user1, user2: '' },
     memberUids: [currentAuthUser.uid],
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   });
   return code;
 }
 
-async function joinRoom(code) {
+async function joinRoom(code, userName) {
   const upperCode = code.toUpperCase().trim();
-  const snap = await db.collection('rooms').doc(upperCode).get();
+  const roomRef = db.collection('rooms').doc(upperCode);
+  const snap = await roomRef.get();
   if (!snap.exists) throw new Error('ルームが見つかりません。合言葉を確認してください');
+
+  const roomData = snap.data();
+  const updates = {};
+
   // 参加者のUIDをメンバーリストに追加
   if (currentAuthUser) {
-    await db.collection('rooms').doc(upperCode).update({
-      memberUids: firebase.firestore.FieldValue.arrayUnion(currentAuthUser.uid)
-    });
+    updates.memberUids = firebase.firestore.FieldValue.arrayUnion(currentAuthUser.uid);
   }
-  const roomData = snap.data();
+
+  // ふたりモードは、参加者本人が入力した名前で未設定側を埋める
+  if (roomData.mode !== 'group' && userName) {
+    const users = roomData.users || { user1: '', user2: '' };
+    const normalized = userName.trim();
+    if (normalized) {
+      let nextUsers = null;
+      if (!users.user1) {
+        nextUsers = { ...users, user1: normalized };
+      } else if (!users.user2) {
+        nextUsers = { ...users, user2: normalized };
+      }
+      if (nextUsers) {
+        updates.users = nextUsers;
+        roomData.users = nextUsers;
+      }
+    }
+  }
+
+  if (Object.keys(updates).length > 0) {
+    await roomRef.update(updates);
+  }
+
   return { code: upperCode, users: roomData.users, members: roomData.members, mode: roomData.mode };
 }
 
@@ -1762,16 +1787,15 @@ function setupEvents() {
   $('btn-create-room').addEventListener('click', async () => {
     const groupName = $('group-name-input').value.trim() || 'グループ';
     const u1 = $('user1-name').value.trim();
-    const u2 = $('user2-name').value.trim();
-    if (!u1 || !u2) { showToast('ふたりの名前を入力してください', { type: 'error' }); return; }
+    if (!u1) { showToast('名前を入力してください', { type: 'error' }); return; }
     showSetupStep('step-loading');
     try {
-      const code = await createRoom(u1, u2);
+      const code = await createRoom(u1);
       const groupId = uid();
       const newGroup = { id: groupId, name: groupName, roomCode: code, archived: false, createdAt: Date.now(), mode: 'pair' };
       groups.push(newGroup);
       saveGroups();
-      const gData = { users: { user1: u1, user2: u2 }, expenses: [], groupName: groupName };
+      const gData = { users: { user1: u1, user2: '' }, expenses: [], groupName: groupName };
       saveGroupData(groupId, gData);
 
       currentGroupId = groupId;
@@ -1803,11 +1827,13 @@ function setupEvents() {
   // ルームに参加
   $('btn-join-room').addEventListener('click', async () => {
     const groupName = $('join-group-name') ? $('join-group-name').value.trim() : '';
+    const joinUserName = $('join-user-name') ? $('join-user-name').value.trim() : '';
     const code = $('join-code-input').value.trim();
     if (!code || code.length < 4) { showToast('合言葉を入力してください', { type: 'error' }); return; }
+    if (!joinUserName) { showToast('あなたの名前を入力してください', { type: 'error' }); return; }
     showSetupStep('step-loading');
     try {
-      const result = await joinRoom(code);
+      const result = await joinRoom(code, joinUserName);
       const joinMode = result.mode || 'pair';
       const groupId = uid();
       const newGroup = { id: groupId, name: groupName || 'グループ', roomCode: result.code, archived: false, createdAt: Date.now(), mode: joinMode };
