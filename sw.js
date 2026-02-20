@@ -1,5 +1,5 @@
 // ふたりの割り勘帳 — Service Worker
-const CACHE_NAME = 'warikan-v15';
+const CACHE_NAME = 'warikan-v16';
 const ASSETS = [
   './',
   './index.html',
@@ -44,6 +44,26 @@ self.addEventListener('fetch', event => {
 
   // 外部リソースは触らない
   if (url.origin !== self.location.origin) return;
+
+  // 重要アセットは network-first（古いJS/CSS固定化を防ぐ）
+  const isCritical =
+    url.pathname.endsWith('/app.js') ||
+    url.pathname.endsWith('/style.css') ||
+    url.pathname.endsWith('/manifest.json');
+  if (isCritical) {
+    event.respondWith(
+      fetch(req)
+        .then(response => {
+          if (response && response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(req, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(req))
+    );
+    return;
+  }
 
   // 同一オリジンの静的アセットのみをキャッシュ対象にする
   const staticAsset = /\.(?:css|js|json|svg|png|jpg|jpeg|webp|woff2?)$/i.test(url.pathname);
