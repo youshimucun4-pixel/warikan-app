@@ -31,6 +31,10 @@ if (USE_FIREBASE) {
     auth.onAuthStateChanged(async user => {
       currentAuthUser = user;
       updateAuthUI();
+      if (document.readyState === 'loading') {
+        pendingScreenId = user ? 'home-screen' : 'start-screen';
+        return;
+      }
       // ログイン済みならホーム画面へ、未ログインなら最初の画面（登録から）へ
       if (user) {
         if (pendingInviteToken) {
@@ -83,6 +87,7 @@ let trendCategoryFilter = 'all';
 let actionGroupId = null;
 let pendingMode = 'pair'; // 'solo' | 'pair' — セットアップ中の選択を保持
 let pendingInviteToken = null;
+let pendingScreenId = null;
 
 // ==================== DOM ====================
 const $ = id => document.getElementById(id);
@@ -306,12 +311,13 @@ function getArchivedGroups() {
 
 // ==================== 画面遷移 ====================
 function showScreen(screenId) {
+  const target = $(screenId);
+  if (!target) return;
   ['start-screen', 'home-screen', 'setup-screen', 'main-screen'].forEach(id => {
     const el = $(id);
     if (el) el.classList.add('hidden');
   });
-  const target = $(screenId);
-  if (target) target.classList.remove('hidden');
+  target.classList.remove('hidden');
 }
 
 function showStartScreen() {
@@ -2266,4 +2272,8 @@ function setupEvents() {
 document.addEventListener('DOMContentLoaded', () => {
   setupEvents();
   initApp();
+  if (pendingScreenId) {
+    showScreen(pendingScreenId);
+    pendingScreenId = null;
+  }
 });
