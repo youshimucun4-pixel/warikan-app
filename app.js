@@ -29,21 +29,28 @@ if (USE_FIREBASE) {
     db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
     auth = firebase.auth();
     auth.onAuthStateChanged(async user => {
-      currentAuthUser = user;
-      updateAuthUI();
-      if (document.readyState === 'loading') {
-        pendingScreenId = user ? 'home-screen' : 'start-screen';
-        return;
-      }
-      // ログイン済みならホーム画面へ、未ログインなら最初の画面（登録から）へ
-      if (user) {
-        if (pendingInviteToken) {
-          await startInviteJoinFlow(pendingInviteToken);
+      try {
+        currentAuthUser = user;
+        updateAuthUI();
+        if (document.readyState === 'loading') {
+          pendingScreenId = user ? 'home-screen' : 'start-screen';
           return;
         }
-        showHomeScreen();
-      } else {
+        // ログイン済みならホーム画面へ、未ログインなら最初の画面（登録から）へ
+        if (user) {
+          if (pendingInviteToken) {
+            await startInviteJoinFlow(pendingInviteToken);
+            return;
+          }
+          showHomeScreen();
+        } else {
+          showStartScreen();
+        }
+        ensureVisibleScreen();
+      } catch (e) {
+        console.error('Auth state handler error:', e);
         showStartScreen();
+        ensureVisibleScreen();
       }
     });
   } catch (e) {
@@ -318,6 +325,17 @@ function showScreen(screenId) {
     if (el) el.classList.add('hidden');
   });
   target.classList.remove('hidden');
+}
+
+function ensureVisibleScreen() {
+  const ids = ['start-screen', 'home-screen', 'setup-screen', 'main-screen'];
+  const visible = ids.some(id => {
+    const el = $(id);
+    return el && !el.classList.contains('hidden');
+  });
+  if (visible) return;
+  if (currentAuthUser) showScreen('home-screen');
+  else showScreen('start-screen');
 }
 
 function showStartScreen() {
@@ -2276,4 +2294,15 @@ document.addEventListener('DOMContentLoaded', () => {
     showScreen(pendingScreenId);
     pendingScreenId = null;
   }
+  ensureVisibleScreen();
+});
+
+window.addEventListener('error', (e) => {
+  console.error('Unhandled error:', e.error || e.message || e);
+  ensureVisibleScreen();
+});
+
+window.addEventListener('unhandledrejection', (e) => {
+  console.error('Unhandled rejection:', e.reason || e);
+  ensureVisibleScreen();
 });
