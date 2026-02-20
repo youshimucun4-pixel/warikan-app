@@ -1,0 +1,28 @@
+{
+  "name": "warikan-app",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "prepare:web": "node scripts/prepare-web.js",
+    "cap:sync:ios": "npm run prepare:web && npx cap sync ios",
+    "cap:open:ios": "npx cap open ios"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/youshimucun4-pixel/warikan-app.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/youshimucun4-pixel/warikan-app/issues"
+  },
+  "homepage": "https://github.com/youshimucun4-pixel/warikan-app#readme",
+  "devDependencies": {
+    "@capacitor/cli": "^8.1.0",
+    "@capacitor/core": "^8.1.0",
+    "@capacitor/ios": "^8.1.0"
+  }
+}

@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>割り勘帳 — ふたりの割り勘・建て替え管理アプリ</title>
+  <meta name="description" content="カップル・ルームシェア・旅行の割り勘をかんたん管理。支出を記録して、誰が誰にいくら払うか一目瞭然。無料のPWAアプリ。">
+
+  <!-- OGP (Open Graph) -->
+  <meta property="og:title" content="割り勘帳">
+  <meta property="og:description" content="ふたりの割り勘・建て替えをかんたん管理。支出を記録して清算額が一目瞭然。">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://youshimucun4-pixel.github.io/warikan-app/">
+  <meta property="og:image" content="https://youshimucun4-pixel.github.io/warikan-app/ogp.png">
+  <meta property="og:locale" content="ja_JP">
+  <meta property="og:site_name" content="割り勘帳">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="割り勘帳">
+  <meta name="twitter:description" content="ふたりの割り勘・建て替えをかんたん管理。支出を記録して清算額が一目瞭然。">
+  <meta name="twitter:image" content="https://youshimucun4-pixel.github.io/warikan-app/ogp.png">
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#F5F0E8">
+
+  <!-- iOS (Safari) 対応 -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="割り勘帳">
+  <link rel="apple-touch-icon" href="icon-180.png">
+
+  <!-- Fonts -->
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+
+  <!-- Firebase SDK (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <div id="app">
+
+    <!-- ====== 最初の画面（アカウント登録から始める） ====== -->
+    <div id="start-screen" class="screen">
+      <div class="start-container">
+        <div class="start-brand">
+          <div class="setup-stamp">割</div>
+          <h1 class="start-title">割り勘帳</h1>
+        </div>
+        <p class="start-message">アカウントでログインすると<br>複数端末でデータを共有できます</p>
+        <div class="start-actions">
+          <button type="button" id="start-google-btn" class="btn btn-google btn-block">
+            <svg class="btn-google-icon" viewBox="0 0 24 24" width="20" height="20"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+            Googleで続ける
+          </button>
+          <button type="button" id="start-signup-btn" class="btn btn-outline btn-block">メールで登録</button>
+          <button type="button" id="start-login-btn" class="btn btn-ghost btn-block">すでにアカウントがある方はログイン</button>
+        </div>
+        <div class="start-legal">
+          <a href="./terms.html" target="_blank" class="legal-link">利用規約</a>
+          <span class="legal-sep">|</span>
+          <a href="./privacy.html" target="_blank" class="legal-link">プライバシーポリシー</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== ホーム画面（グループ一覧） ====== -->
+    <div id="home-screen" class="screen hidden">
+      <div class="home-container">
+        <div class="home-brand">
+          <div class="setup-stamp">割</div>
+          <h1 class="home-title">割り勘帳</h1>
+        </div>
+        <!-- オンボーディング（グループ0件時のみ表示・このとき上部ブランドは非表示） -->
+        <div id="onboarding" class="onboarding hidden">
+          <p class="onboarding-app-name">割り勘帳</p>
+          <div class="onboarding-illustration">
+            <div class="onboard-stamp">割</div>
+            <div class="onboard-circles"></div>
+          </div>
+          <h2 class="onboarding-title">はじめましょう</h2>
+          <p class="onboarding-subtitle">かんたん3ステップで<br>割り勘をスタート</p>
+          <div class="onboarding-steps">
+            <div class="onboard-step">
+              <div class="onboard-step-num">1</div>
+              <div class="onboard-step-body">
+                <h3>グループをつくる</h3>
+                <p>メンバーの名前を入れてグループを作成</p>
+              </div>
+            </div>
+            <div class="onboard-step">
+              <div class="onboard-step-num">2</div>
+              <div class="onboard-step-body">
+                <h3>支出を記録する</h3>
+                <p>誰がいくら払ったかをサッと記録</p>
+              </div>
+            </div>
+            <div class="onboard-step">
+              <div class="onboard-step-num">3</div>
+              <div class="onboard-step-body">
+                <h3>分析・清算</h3>
+                <p>支出の傾向を分析、割り勘なら清算も</p>
+              </div>
+            </div>
+          </div>
+          <button id="onboard-start-btn" class="btn btn-warm btn-block">はじめる</button>
+        </div>
+
+        <div id="group-list" class="group-list"></div>
+        <div id="archived-section" class="archived-section hidden">
+          <button id="toggle-archived" class="archived-toggle-btn">
+            <span id="archived-toggle-icon" class="toggle-arrow">▾</span> アーカイブ
+          </button>
+          <div id="archived-list" class="group-list"></div>
+        </div>
+        <button id="add-group-btn" class="btn btn-warm btn-block home-add-btn">＋ 新しいグループ</button>
+        <p class="home-limit-text" id="home-limit-text"></p>
+      </div>
+    </div>
+
+    <!-- ====== 初期設定画面 ====== -->
+    <div id="setup-screen" class="screen hidden">
+      <div class="setup-container">
+        <div class="setup-stamp">割</div>
+        <h1 class="setup-title">割り勘帳</h1>
+
+        <!-- ステップ: モード選択（個人 or ふたり） -->
+        <div id="step-mode" class="setup-step hidden">
+          <p class="setup-desc">使い方を選んでください</p>
+          <div class="setup-form">
+            <button id="btn-mode-solo" class="mode-choice-btn">
+              <span class="mode-choice-icon">📒</span>
+              <span class="mode-choice-label">個人で使う</span>
+              <span class="mode-choice-desc">ひとりの家計簿として</span>
+            </button>
+            <button id="btn-mode-pair" class="mode-choice-btn">
+              <span class="mode-choice-icon">👥</span>
+              <span class="mode-choice-label">ふたりで使う</span>
+              <span class="mode-choice-desc">割り勘・建て替え管理</span>
+            </button>
+            <button id="btn-mode-group" class="mode-choice-btn">
+              <span class="mode-choice-icon">🍻</span>
+              <span class="mode-choice-label">グループで使う</span>
+              <span class="mode-choice-desc">3〜10人の飲み会・旅行に</span>
+            </button>
+            <button type="button" id="btn-mode-back" class="btn-link hidden">&larr; ホームに戻る</button>
+          </div>
+        </div>
+
+        <!-- ステップ: 選択 (Firebase モード) -->
+        <div id="step-choice" class="setup-step hidden">
+          <p class="setup-desc">グループを作って<br>共有しましょう</p>
+          <div class="setup-form">
+            <button id="btn-to-create" class="btn btn-warm btn-block">新しいグループをつくる</button>
+            <button id="btn-to-join" class="btn btn-outline btn-block">グループに参加する</button>
+            <button type="button" id="btn-setup-back" class="btn-link">&larr; もどる</button>
+          </div>
+        </div>
+
+        <!-- ステップ: グループ作成 -->
+        <div id="step-create" class="setup-step hidden">
+          <p class="setup-desc">グループの情報を入力してください</p>
+          <div class="setup-form">
+            <div class="setup-field">
+              <input type="text" id="group-name-input" placeholder="グループ名（例：家計簿）" maxlength="20">
+            </div>
+            <div class="setup-divider"></div>
+            <div class="setup-field">
+              <input type="text" id="user1-name" placeholder="あなたの名前" maxlength="10">
+            </div>
+            <button id="btn-create-room" class="btn btn-warm btn-block">つくる</button>
+            <button type="button" id="btn-back-create" class="btn-link">&larr; もどる</button>
+          </div>
+        </div>
+
+        <!-- ステップ: 合言葉表示 -->
+        <div id="step-code" class="setup-step hidden">
+          <p class="setup-desc">グループができました！</p>
+          <div class="setup-form">
+            <div class="room-code-card">
+              <span class="room-code-label">合言葉</span>
+              <div class="room-code-value" id="display-code"></div>
+              <button id="btn-copy-code" class="btn btn-outline btn-sm">コピー</button>
+              <p class="room-code-hint">この合言葉を相手に伝えてください<br>相手は「グループに参加する」から入力します</p>
+            </div>
+            <button id="btn-start" class="btn btn-warm btn-block">はじめる</button>
+          </div>
+        </div>
+
+        <!-- ステップ: コード入力 (参加) -->
+        <div id="step-join" class="setup-step hidden">
+          <p class="setup-desc">相手から聞いた<br>合言葉を入力してください</p>
+          <div class="setup-form">
+            <div class="setup-field">
+              <input type="text" id="join-group-name" placeholder="グループ名（任意）" maxlength="20">
+            </div>
+            <div class="setup-field">
+              <input type="text" id="join-user-name" placeholder="あなたの名前" maxlength="10">
+            </div>
+            <div class="setup-field">
+              <input type="text" id="join-code-input" placeholder="合言葉（6文字）" maxlength="6" autocapitalize="characters" autocomplete="off" spellcheck="false">
+            </div>
+            <button id="btn-join-room" class="btn btn-warm btn-block">参加する</button>
+            <button type="button" id="btn-back-join" class="btn-link">&larr; もどる</button>
+          </div>
+        </div>
+
+        <!-- ステップ: ローディング -->
+        <div id="step-loading" class="setup-step hidden">
+          <div class="spinner"></div>
+          <p class="setup-desc">接続中...</p>
+        </div>
+
+        <!-- ステップ: ソロ作成 (Firebase有り) -->
+        <div id="step-solo-create" class="setup-step hidden">
+          <p class="setup-desc">個人の家計簿をつくりましょう</p>
+          <div class="setup-form">
+            <div class="setup-field">
+              <input type="text" id="solo-group-name" placeholder="グループ名（例：家計簿）" maxlength="20">
+            </div>
+            <div class="setup-divider"></div>
+            <div class="setup-field">
+              <input type="text" id="solo-user-name" placeholder="あなたの名前" maxlength="10">
+            </div>
+            <button id="btn-solo-create" class="btn btn-warm btn-block">つくる</button>
+            <button type="button" id="btn-back-solo" class="btn-link">&larr; もどる</button>
+          </div>
+        </div>
+
+        <!-- ステップ: ローカルモード — ソロ (Firebase未設定) -->
+        <div id="step-local-solo" class="setup-step hidden">
+          <p class="setup-desc">個人の家計簿をつくりましょう</p>
+          <div class="setup-form">
+            <div class="setup-field">
+              <input type="text" id="local-solo-group-name" placeholder="グループ名（例：家計簿）" maxlength="20">
+            </div>
+            <div class="setup-divider"></div>
+            <div class="setup-field">
+              <input type="text" id="local-solo-user-name" placeholder="あなたの名前" maxlength="10">
+            </div>
+            <button id="local-solo-start-btn" class="btn btn-warm btn-block">はじめる</button>
+            <button type="button" id="btn-back-local-solo" class="btn-link">&larr; もどる</button>
+            <p class="setup-hint">※ オフラインモード（同期なし）</p>
+          </div>
+        </div>
+
+        <!-- ステップ: ローカルモード (Firebase未設定) -->
+        <div id="step-local" class="setup-step hidden">
+          <p class="setup-desc">グループの情報を入力して<br>はじめましょう</p>
+          <div class="setup-form">
+            <div class="setup-field">
+              <input type="text" id="local-group-name" placeholder="グループ名（例：家計簿）" maxlength="20">
+            </div>
+            <div class="setup-divider"></div>
+            <div class="setup-field">
+              <input type="text" id="local-user1" placeholder="ひとりめの名前" maxlength="10">
+            </div>
+            <div class="setup-ampersand">&amp;</div>
+            <div class="setup-field">
+              <input type="text" id="local-user2" placeholder="ふたりめの名前" maxlength="10">
+            </div>
+            <button id="local-start-btn" class="btn btn-warm btn-block">はじめる</button>
+            <button type="button" id="btn-setup-back-local" class="btn-link">&larr; もどる</button>
+            <p class="setup-hint">※ オフラインモード（同期なし）</p>
+          </div>
+        </div>
+      </div>
+
+        <!-- ステップ: グループ選択 (Firebase モード: 作成 or 参加) -->
+        <div id="step-group-choice" class="setup-step hidden">
+          <p class="setup-desc">グループを作って<br>みんなで共有しましょう</p>
+          <div class="setup-form">
+            <button id="btn-to-group-create" class="btn btn-warm btn-block">新しいグループをつくる</button>
+            <button id="btn-to-group-join" class="btn btn-outline btn-block">グループに参加する</button>
+            <button type="button" id="btn-back-group-choice" class="btn-link">&larr; もどる</button>
+          </div>
+        </div>
+
+        <!-- ステップ: グループ作成 (グループモード) -->
+        <div id="step-group-create" class="setup-step hidden">
+          <p class="setup-desc">グループの情報を入力してください</p>
+          <div class="setup-form">
+            <div class="setup-field">
+              <input type="text" id="group-mode-name-input" placeholder="グループ名（例：新年会）" maxlength="20">
+            </div>
+            <div class="setup-divider"></div>
+            <div id="group-members-inputs" class="group-members-inputs">
+              <div class="setup-field group-member-field"><input type="text" placeholder="メンバー1の名前" maxlength="10"></div>
+              <div class="setup-field group-member-field"><input type="text" placeholder="メンバー2の名前" maxlength="10"></div>
+              <div class="setup-field group-member-field"><input type="text" placeholder="メンバー3の名前" maxlength="10"></div>
+            </div>
+            <button type="button" id="btn-add-member" class="btn btn-outline btn-sm">＋ メンバーを追加</button>
+            <button id="btn-create-group-room" class="btn btn-warm btn-block">つくる</button>
+            <button type="button" id="btn-back-group-create" class="btn-link">&larr; もどる</button>
+          </div>
+        </div>
+
+        <!-- ステップ: ローカルグループ作成 (Firebase未設定) -->
+        <div id="step-local-group" class="setup-step hidden">
+          <p class="setup-desc">グループの情報を入力してください</p>
+          <div class="setup-form">
+            <div class="setup-field">
+              <input type="text" id="local-group-mode-name" placeholder="グループ名（例：新年会）" maxlength="20">
+            </div>
+            <div class="setup-divider"></div>
+            <div id="local-group-members-inputs" class="group-members-inputs">
+              <div class="setup-field group-member-field"><input type="text" placeholder="メンバー1の名前" maxlength="10"></div>
+              <div class="setup-field group-member-field"><input type="text" placeholder="メンバー2の名前" maxlength="10"></div>
+              <div class="setup-field group-member-field"><input type="text" placeholder="メンバー3の名前" maxlength="10"></div>
+            </div>
+            <button type="button" id="btn-add-local-member" class="btn btn-outline btn-sm">＋ メンバーを追加</button>
+            <button id="btn-create-local-group" class="btn btn-warm btn-block">はじめる</button>
+            <button type="button" id="btn-back-local-group" class="btn-link">&larr; もどる</button>
+            <p class="setup-hint">※ オフラインモード（同期なし）</p>
+          </div>
+        </div>
+    </div>
+
+    <!-- ====== メイン画面 ====== -->
+    <div id="main-screen" class="screen hidden">
+
+      <!-- ヘッダー -->
+      <header class="header anim-in" style="--delay:0">
+        <button id="back-to-home" class="btn-icon" title="ホーム">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <h1 class="header-title" id="header-group-name">割り勘帳</h1>
+        <div class="header-right">
+          <span id="sync-badge" class="sync-badge hidden">同期中</span>
+          <button id="settings-btn" class="btn-icon" title="設定">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- タブバー -->
+      <div class="tab-bar anim-in" style="--delay:1">
+        <button class="tab-btn active" data-tab="record">記録</button>
+        <button class="tab-btn" data-tab="analytics">分析</button>
+      </div>
+
+      <!-- 月ナビゲーション -->
+      <nav class="month-nav anim-in" style="--delay:2">
+        <button id="prev-month" class="btn-icon" title="前月">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <h2 id="current-month" class="month-label"></h2>
+        <button id="next-month" class="btn-icon" title="次月">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </nav>
+
+      <!-- ====== 記録パネル ====== -->
+      <div id="panel-record" class="panel">
+        <section class="ledger anim-in" style="--delay:3">
+          <div class="ledger-top-rule"></div>
+          <div class="ledger-total">
+            <span class="ledger-total-label">合計支出</span>
+            <span class="ledger-total-amount" id="ledger-total">¥0</span>
+          </div>
+          <div class="ledger-rule"></div>
+          <div class="ledger-people">
+            <div class="ledger-person">
+              <span class="ledger-person-name" id="ledger-user1-name">—</span>
+              <span class="ledger-person-sub">支払い済</span>
+              <span class="ledger-person-amount" id="ledger-user1-paid">¥0</span>
+            </div>
+            <div class="ledger-person">
+              <span class="ledger-person-name" id="ledger-user2-name">—</span>
+              <span class="ledger-person-sub">支払い済</span>
+              <span class="ledger-person-amount" id="ledger-user2-paid">¥0</span>
+            </div>
+          </div>
+          <div class="ledger-rule"></div>
+          <div class="ledger-settlement" id="ledger-settlement">
+            <span class="settlement-text" id="settlement-text">まだ支出がありません</span>
+          </div>
+          <div class="settlement-actions hidden" id="settlement-actions">
+            <button id="btn-line-share" class="btn btn-outline btn-sm settlement-action-btn" title="LINEで送る">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="#06C755"><path d="M12 2C6.48 2 2 5.88 2 10.54c0 4.24 3.76 7.78 8.84 8.45.34.07.81.23.93.52.1.27.07.68.03.95l-.15.89c-.05.27-.21 1.05.92.57s6.13-3.61 8.36-6.18C22.58 13.78 22 12.2 22 10.54 22 5.88 17.52 2 12 2z"/></svg>
+              <span>LINEで送る</span>
+            </button>
+          </div>
+          <div class="ledger-bottom-rule"></div>
+        </section>
+
+        <!-- グループモード用レジャー（group-mode時のみ表示） -->
+        <section class="ledger group-ledger hidden" id="group-ledger" style="--delay:3">
+          <div class="ledger-top-rule"></div>
+          <div class="ledger-total">
+            <span class="ledger-total-label">合計支出</span>
+            <span class="ledger-total-amount" id="group-ledger-total">¥0</span>
+          </div>
+          <div class="ledger-rule"></div>
+          <div class="group-members-grid" id="group-members-grid"></div>
+          <div class="ledger-rule"></div>
+          <div class="group-settlement" id="group-settlement">
+            <span style="color:var(--ink-light)">まだ支出がありません</span>
+          </div>
+          <div class="settlement-actions hidden" id="group-settlement-actions">
+            <button id="btn-group-line-share" class="btn btn-outline btn-sm settlement-action-btn" title="LINEで送る">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="#06C755"><path d="M12 2C6.48 2 2 5.88 2 10.54c0 4.24 3.76 7.78 8.84 8.45.34.07.81.23.93.52.1.27.07.68.03.95l-.15.89c-.05.27-.21 1.05.92.57s6.13-3.61 8.36-6.18C22.58 13.78 22 12.2 22 10.54 22 5.88 17.52 2 12 2z"/></svg>
+              <span>LINEで送る</span>
+            </button>
+          </div>
+          <div class="ledger-bottom-rule"></div>
+        </section>
+
+        <section class="category-section" id="category-section">
+          <div class="category-bar-track" id="category-bar"></div>
+          <div class="category-legend" id="category-legend"></div>
+        </section>
+
+        <section class="expense-section">
+          <div class="expense-list-header">
+            <h3>支出一覧</h3>
+            <span class="expense-count" id="expense-count">0件</span>
+          </div>
+          <div class="expense-list" id="expense-list">
+            <div class="empty-state" id="empty-state">
+              <p class="empty-main">まだ支出がありません</p>
+              <p class="empty-sub">下の＋ボタンから追加しましょう</p>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- ====== 分析パネル ====== -->
+      <div id="panel-analytics" class="panel hidden">
+        <section class="chart-card">
+          <h3 class="chart-title">カテゴリ別支出</h3>
+          <div class="donut-wrap">
+            <div class="donut-container" id="donut-container">
+              <svg id="donut-svg" width="190" height="190" viewBox="0 0 190 190"></svg>
+              <div class="donut-center">
+                <span class="donut-center-amount" id="donut-total">¥0</span>
+                <span class="donut-center-label">合計</span>
+              </div>
+            </div>
+          </div>
+          <div class="donut-legend" id="donut-legend"></div>
+          <div class="donut-empty hidden" id="donut-empty">
+            <p>この月のデータがありません</p>
+          </div>
+        </section>
+
+        <section class="chart-card">
+          <h3 class="chart-title">月別推移（6ヶ月）</h3>
+          <div class="trend-filters" id="trend-filters"></div>
+          <div class="trend-chart-wrap">
+            <div class="trend-chart" id="trend-chart"></div>
+          </div>
+        </section>
+      </div>
+
+      <!-- FAB -->
+      <button id="add-btn" class="fab" title="支出を追加">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+    </div>
+
+    <!-- ====== 支出追加/編集モーダル ====== -->
+    <div id="expense-modal" class="modal hidden">
+      <div class="modal-overlay"></div>
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <h2 id="modal-title">支出を追加</h2>
+          <button id="modal-close" class="btn-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <form id="expense-form" class="modal-body">
+          <div class="form-group">
+            <label>カテゴリ</label>
+            <div class="category-grid" id="category-grid"></div>
+          </div>
+          <div class="form-group">
+            <label for="expense-desc">内容</label>
+            <input type="text" id="expense-desc" placeholder="例：スーパーで買い物">
+            <span class="form-error hidden" id="error-desc"></span>
+          </div>
+          <div class="form-group">
+            <label for="expense-amount">金額</label>
+            <div class="input-yen">
+              <span class="yen-mark">¥</span>
+              <input type="number" id="expense-amount" placeholder="0" min="1">
+            </div>
+            <span class="form-error hidden" id="error-amount"></span>
+          </div>
+          <div class="form-group">
+            <label for="expense-date">日付</label>
+            <input type="date" id="expense-date">
+            <span class="form-error hidden" id="error-date"></span>
+          </div>
+          <div class="form-group">
+            <label>支払った人</label>
+            <div class="payer-toggle">
+              <label class="payer-option"><input type="radio" name="paid-by" value="user1" checked><span class="payer-label" id="payer-user1-name"></span></label>
+              <label class="payer-option"><input type="radio" name="paid-by" value="user2"><span class="payer-label" id="payer-user2-name"></span></label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>負担割合</label>
+            <div class="split-options">
+              <label class="split-pill"><input type="radio" name="split-type" value="equal" checked><span>半々</span></label>
+              <label class="split-pill"><input type="radio" name="split-type" value="custom"><span>カスタム</span></label>
+              <label class="split-pill"><input type="radio" name="split-type" value="full"><span>全額片方</span></label>
+            </div>
+          </div>
+          <div id="custom-split" class="form-group hidden">
+            <div class="custom-split-row">
+              <div class="custom-split-side">
+                <span class="split-name" id="split-user1-name"></span>
+                <div class="input-pct"><input type="number" id="split-user1-pct" value="50" min="0" max="100"><span>%</span></div>
+              </div>
+              <div class="custom-split-sep">:</div>
+              <div class="custom-split-side">
+                <span class="split-name" id="split-user2-name"></span>
+                <div class="input-pct"><input type="number" id="split-user2-pct" value="50" min="0" max="100"><span>%</span></div>
+              </div>
+            </div>
+            <div class="split-hint" id="split-hint"></div>
+            <span class="form-error hidden" id="error-split"></span>
+          </div>
+          <div id="full-split" class="form-group hidden">
+            <label>全額負担する人</label>
+            <div class="payer-toggle">
+              <label class="payer-option"><input type="radio" name="full-payer" value="user1" checked><span class="payer-label" id="full-user1-name"></span></label>
+              <label class="payer-option"><input type="radio" name="full-payer" value="user2"><span class="payer-label" id="full-user2-name"></span></label>
+            </div>
+          </div>
+          <!-- グループモード: 支払った人 -->
+          <div class="form-group hidden" id="group-payer-section">
+            <label>支払った人</label>
+            <div class="group-payer-grid" id="group-payer-grid"></div>
+          </div>
+          <!-- グループモード: 負担 -->
+          <div class="form-group hidden" id="group-split-section">
+            <label>負担する人</label>
+            <div class="split-options">
+              <label class="split-pill"><input type="radio" name="group-split-type" value="equal-all" checked><span>全員で均等</span></label>
+              <label class="split-pill"><input type="radio" name="group-split-type" value="equal-select"><span>選んで均等</span></label>
+              <label class="split-pill"><input type="radio" name="group-split-type" value="custom"><span>金額指定</span></label>
+            </div>
+          </div>
+          <!-- グループモード: メンバー選択（選んで均等時） -->
+          <div class="form-group hidden" id="group-split-select">
+            <div class="group-member-checkboxes" id="group-split-checkboxes"></div>
+          </div>
+          <!-- グループモード: カスタム金額入力 -->
+          <div class="form-group hidden" id="group-split-custom">
+            <div class="group-split-custom-list" id="group-split-custom-list"></div>
+            <div class="split-hint" id="group-split-hint"></div>
+          </div>
+          <div class="form-actions">
+            <button type="button" id="delete-expense-btn" class="btn btn-ghost-danger hidden">削除</button>
+            <button type="submit" class="btn btn-warm">保存する</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ====== 設定モーダル ====== -->
+    <div id="settings-modal" class="modal hidden">
+      <div class="modal-overlay"></div>
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <h2>設定</h2>
+          <button id="settings-close" class="btn-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="settings-account-section">
+            <h4>アカウント</h4>
+            <div id="settings-account-guest" class="account-guest">
+              <p class="account-guest-text">ログインすると、複数端末で同じアカウントを使えます</p>
+              <button type="button" id="btn-google-login" class="btn btn-google btn-block">
+                <svg class="btn-google-icon" viewBox="0 0 24 24" width="18" height="18"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                Googleでログイン
+              </button>
+              <button type="button" id="btn-open-signup" class="btn btn-outline btn-block">メールで新規登録</button>
+              <button type="button" id="btn-open-login" class="btn btn-ghost btn-block">メールでログイン</button>
+            </div>
+            <div id="settings-account-user" class="account-user hidden">
+              <p class="account-user-email" id="settings-account-email"></p>
+              <button type="button" id="btn-logout" class="btn btn-outline">ログアウト</button>
+            </div>
+          </div>
+          <div id="settings-room-section" class="form-group hidden">
+            <label>合言葉コード</label>
+            <div class="room-code-inline">
+              <span id="settings-room-code" class="room-code-mono"></span>
+              <button type="button" id="settings-copy-code" class="btn-copy">コピー</button>
+            </div>
+            <p class="room-code-hint-sm">この合言葉で相手とグループを共有できます</p>
+          </div>
+          <div class="form-group">
+            <label for="settings-group-name">グループ名</label>
+            <input type="text" id="settings-group-name" maxlength="20">
+          </div>
+          <div class="form-group">
+            <label for="settings-user1">ひとりめの名前</label>
+            <input type="text" id="settings-user1" maxlength="10">
+          </div>
+          <div class="form-group" id="settings-user2-group">
+            <label for="settings-user2">ふたりめの名前</label>
+            <input type="text" id="settings-user2" maxlength="10">
+          </div>
+          <div class="form-group hidden" id="settings-group-members">
+            <label>メンバー</label>
+            <div id="settings-members-list" class="settings-members-list"></div>
+            <button type="button" id="settings-add-member" class="btn btn-outline btn-sm">＋ メンバーを追加</button>
+          </div>
+          <div class="form-actions">
+            <button id="settings-save" class="btn btn-warm">保存</button>
+          </div>
+          <div class="settings-extra">
+            <h4>データ管理</h4>
+            <button id="export-btn" class="btn btn-outline">エクスポート</button>
+            <button id="reset-btn" class="btn btn-ghost-danger">グループから退出する</button>
+          </div>
+          <div class="settings-legal">
+            <a href="./privacy.html" target="_blank" class="legal-link">プライバシーポリシー</a>
+            <span class="legal-sep">|</span>
+            <a href="./terms.html" target="_blank" class="legal-link">利用規約</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== グループ操作モーダル ====== -->
+    <div id="group-action-modal" class="modal hidden">
+      <div class="modal-overlay"></div>
+      <div class="modal-sheet group-action-sheet">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <h2 id="group-action-name">グループ操作</h2>
+          <button id="group-action-close" class="btn-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="group-action-list">
+            <button id="action-rename" class="group-action-item">
+              <span class="ga-icon">✏️</span><span>名前を変更</span>
+            </button>
+            <button id="action-archive" class="group-action-item">
+              <span class="ga-icon">📦</span><span id="action-archive-label">アーカイブ</span>
+            </button>
+            <button id="action-delete" class="group-action-item group-action-danger">
+              <span class="ga-icon">🗑️</span><span>削除する</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== リネームモーダル ====== -->
+    <div id="rename-modal" class="modal hidden">
+      <div class="modal-overlay"></div>
+      <div class="modal-dialog">
+        <p class="rename-title">グループ名を変更</p>
+        <div class="form-group rename-field">
+          <input type="text" id="rename-input" maxlength="20" placeholder="新しいグループ名">
+        </div>
+        <div class="dialog-actions">
+          <button id="rename-cancel" class="btn btn-outline">キャンセル</button>
+          <button id="rename-ok" class="btn btn-warm">変更</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== アカウント（登録・ログイン）モーダル ====== -->
+    <div id="auth-modal" class="modal hidden">
+      <div class="modal-overlay"></div>
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <h2 id="auth-modal-title">アカウント登録</h2>
+          <button id="auth-modal-close" class="btn-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="auth-tabs">
+            <button type="button" id="auth-tab-signup" class="auth-tab active">新規登録</button>
+            <button type="button" id="auth-tab-login" class="auth-tab">ログイン</button>
+          </div>
+          <form id="auth-form" class="auth-form">
+            <div class="form-group">
+              <label for="auth-email">メールアドレス</label>
+              <input type="email" id="auth-email" placeholder="example@email.com" autocomplete="email" required>
+              <span class="form-error hidden" id="auth-error-email"></span>
+            </div>
+            <div class="form-group">
+              <label for="auth-password">パスワード</label>
+              <input type="password" id="auth-password" placeholder="6文字以上" autocomplete="current-password" minlength="6" required>
+              <span class="form-error hidden" id="auth-error-password"></span>
+            </div>
+            <div id="auth-confirm-wrap" class="form-group">
+              <label for="auth-password-confirm">パスワード（確認）</label>
+              <input type="password" id="auth-password-confirm" placeholder="もう一度入力" autocomplete="new-password" minlength="6">
+              <span class="form-error hidden" id="auth-error-confirm"></span>
+            </div>
+            <span class="form-error hidden" id="auth-error-general"></span>
+            <div class="form-actions">
+              <button type="submit" id="auth-submit" class="btn btn-warm btn-block">登録する</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== 確認ダイアログ ====== -->
+    <div id="confirm-dialog" class="modal hidden">
+      <div class="modal-overlay"></div>
+      <div class="modal-dialog">
+        <p id="confirm-message"></p>
+        <div class="dialog-actions">
+          <button id="confirm-cancel" class="btn btn-outline">キャンセル</button>
+          <button id="confirm-ok" class="btn btn-ghost-danger">実行する</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js')
+        .then(() => console.log('SW registered'))
+        .catch(e => console.warn('SW registration failed:', e));
+    }
+    (function generateAppleTouchIcon() {
+      try {
+        const s = 180, c = document.createElement('canvas');
+        c.width = s; c.height = s;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#F5F0E8';
+        ctx.beginPath(); ctx.roundRect(0, 0, s, s, s * 0.22); ctx.fill();
+        ctx.strokeStyle = 'rgba(198,93,62,.3)'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(s/2, s/2, s*0.38, 0, Math.PI*2); ctx.stroke();
+        ctx.strokeStyle = '#C65D3E'; ctx.lineWidth = 3.5;
+        ctx.beginPath(); ctx.arc(s/2, s/2, s*0.32, 0, Math.PI*2); ctx.stroke();
+        ctx.fillStyle = '#C65D3E'; ctx.font = '700 68px serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('割', s/2, s/2 + 2);
+        const link = document.querySelector('link[rel="apple-touch-icon"]');
+        if (link) link.href = c.toDataURL('image/png');
+      } catch(e) {}
+    })();
+  </script>
+</body>
+</html>
