@@ -751,9 +751,10 @@
   <script src="app.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js')
-        .then(() => console.log('SW registered'))
-        .catch(e => console.warn('SW registration failed:', e));
+      navigator.serviceWorker.getRegistrations()
+        .then(regs => Promise.all(regs.map(r => r.unregister())))
+        .then(() => console.log('SW unregistered'))
+        .catch(e => console.warn('SW unregister failed:', e));
     }
     (function generateAppleTouchIcon() {
       try {
