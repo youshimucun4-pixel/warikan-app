@@ -1,5 +1,5 @@
 // ふたりの割り勘帳 — Service Worker
-const CACHE_NAME = 'warikan-v12';
+const CACHE_NAME = 'warikan-v13';
 const ASSETS = [
   './',
   './index.html',
@@ -31,32 +31,46 @@ self.addEventListener('activate', event => {
 
 // リクエスト時: キャッシュ優先 → ネットワークにフォールバック
 self.addEventListener('fetch', event => {
+  const req = event.request;
+  const url = new URL(req.url);
+
+  // 拡張機能や非GETリクエストとは競合しない
+  if (req.method !== 'GET') return;
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+
   // Google Fonts 等の外部リソースはネットワーク優先
-  if (!event.request.url.startsWith(self.location.origin)) {
+  if (url.origin !== self.location.origin) {
     event.respondWith(
-      fetch(event.request)
+      fetch(req)
         .then(response => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          // 外部は無差別キャッシュせず、そのまま返す
           return response;
         })
-        .catch(() => caches.match(event.request))
+        .catch(() => caches.match(req))
     );
     return;
   }
 
   // 自サイトのリソースはキャッシュ優先
   event.respondWith(
-    caches.match(event.request)
+    caches.match(req)
       .then(cached => {
         if (cached) {
           // バックグラウンドでキャッシュを更新
-          fetch(event.request).then(response => {
-            caches.open(CACHE_NAME).then(cache => cache.put(event.request, response));
+          fetch(req).then(response => {
+            if (response && response.ok) {
+              caches.open(CACHE_NAME).then(cache => cache.put(req, response));
+            }
           }).catch(() => {});
           return cached;
         }
-        return fetch(event.request);
+        return fetch(req).then(response => {
+          if (response && response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(req, clone));
+          }
+          return response;
+        });
       })
   );
 });
