@@ -1,5 +1,5 @@
 // ふたりの割り勘帳 — Service Worker
-const CACHE_NAME = 'warikan-v16';
+const CACHE_NAME = 'warikan-v12';
 const ASSETS = [
   './',
   './index.html',
@@ -31,54 +31,32 @@ self.addEventListener('activate', event => {
 
 // リクエスト時: キャッシュ優先 → ネットワークにフォールバック
 self.addEventListener('fetch', event => {
-  const req = event.request;
-  const url = new URL(req.url);
-
-  // 拡張機能や非GET/非http(s)は対象外
-  if (req.method !== 'GET') return;
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
-
-  // HTML(document/navigate)は常にブラウザ標準のネットワーク処理に任せる
-  // （一瞬表示→消えるような stale HTML 問題を避ける）
-  if (req.mode === 'navigate' || req.destination === 'document') return;
-
-  // 外部リソースは触らない
-  if (url.origin !== self.location.origin) return;
-
-  // 重要アセットは network-first（古いJS/CSS固定化を防ぐ）
-  const isCritical =
-    url.pathname.endsWith('/app.js') ||
-    url.pathname.endsWith('/style.css') ||
-    url.pathname.endsWith('/manifest.json');
-  if (isCritical) {
+  // Google Fonts 等の外部リソースはネットワーク優先
+  if (!event.request.url.startsWith(self.location.origin)) {
     event.respondWith(
-      fetch(req)
+      fetch(event.request)
         .then(response => {
-          if (response && response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(req, clone));
-          }
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
           return response;
         })
-        .catch(() => caches.match(req))
+        .catch(() => caches.match(event.request))
     );
     return;
   }
 
-  // 同一オリジンの静的アセットのみをキャッシュ対象にする
-  const staticAsset = /\.(?:css|js|json|svg|png|jpg|jpeg|webp|woff2?)$/i.test(url.pathname);
-  if (!staticAsset) return;
-
+  // 自サイトのリソースはキャッシュ優先
   event.respondWith(
-    caches.match(req).then(cached => {
-      if (cached) return cached;
-      return fetch(req).then(response => {
-        if (response && response.ok) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(req, clone));
+    caches.match(event.request)
+      .then(cached => {
+        if (cached) {
+          // バックグラウンドでキャッシュを更新
+          fetch(event.request).then(response => {
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, response));
+          }).catch(() => {});
+          return cached;
         }
-        return response;
-      });
-    })
+        return fetch(event.request);
+      })
   );
 });

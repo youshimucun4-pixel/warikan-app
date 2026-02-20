@@ -67,6 +67,7 @@
           <span class="legal-sep">|</span>
           <a href="./privacy.html" target="_blank" class="legal-link">プライバシーポリシー</a>
         </div>
+      </div>
     </div>
 
     <!-- ====== ホーム画面（グループ一覧） ====== -->
@@ -186,7 +187,6 @@
               <span class="room-code-label">合言葉</span>
               <div class="room-code-value" id="display-code"></div>
               <button id="btn-copy-code" class="btn btn-outline btn-sm">コピー</button>
-              <button id="btn-copy-invite-link" class="btn btn-outline btn-sm">10分招待リンクをコピー</button>
               <p class="room-code-hint">この合言葉を相手に伝えてください<br>相手は「グループに参加する」から入力します</p>
             </div>
             <button id="btn-start" class="btn btn-warm btn-block">はじめる</button>
@@ -215,21 +215,6 @@
         <div id="step-loading" class="setup-step hidden">
           <div class="spinner"></div>
           <p class="setup-desc">接続中...</p>
-        </div>
-
-        <!-- ステップ: 招待リンク参加 (コード不要) -->
-        <div id="step-invite-name" class="setup-step hidden">
-          <p class="setup-desc">招待リンクで参加します<br>あなたの名前を入力してください</p>
-          <div class="setup-form">
-            <div class="setup-field">
-              <input type="text" id="invite-group-name" placeholder="グループ名（任意）" maxlength="20">
-            </div>
-            <div class="setup-field">
-              <input type="text" id="invite-user-name" placeholder="あなたの名前" maxlength="10">
-            </div>
-            <button id="btn-invite-join" class="btn btn-warm btn-block">参加する</button>
-            <button type="button" id="btn-invite-cancel" class="btn-link">&larr; もどる</button>
-          </div>
         </div>
 
         <!-- ステップ: ソロ作成 (Firebase有り) -->
@@ -285,6 +270,8 @@
             <p class="setup-hint">※ オフラインモード（同期なし）</p>
           </div>
         </div>
+      </div>
+
         <!-- ステップ: グループ選択 (Firebase モード: 作成 or 参加) -->
         <div id="step-group-choice" class="setup-step hidden">
           <p class="setup-desc">グループを作って<br>みんなで共有しましょう</p>
@@ -303,9 +290,12 @@
               <input type="text" id="group-mode-name-input" placeholder="グループ名（例：新年会）" maxlength="20">
             </div>
             <div class="setup-divider"></div>
-            <div class="setup-field">
-              <input type="text" id="group-owner-name" placeholder="あなたの名前" maxlength="10">
+            <div id="group-members-inputs" class="group-members-inputs">
+              <div class="setup-field group-member-field"><input type="text" placeholder="メンバー1の名前" maxlength="10"></div>
+              <div class="setup-field group-member-field"><input type="text" placeholder="メンバー2の名前" maxlength="10"></div>
+              <div class="setup-field group-member-field"><input type="text" placeholder="メンバー3の名前" maxlength="10"></div>
             </div>
+            <button type="button" id="btn-add-member" class="btn btn-outline btn-sm">＋ メンバーを追加</button>
             <button id="btn-create-group-room" class="btn btn-warm btn-block">つくる</button>
             <button type="button" id="btn-back-group-create" class="btn-link">&larr; もどる</button>
           </div>
@@ -330,7 +320,6 @@
             <p class="setup-hint">※ オフラインモード（同期なし）</p>
           </div>
         </div>
-      </div>
     </div>
 
     <!-- ====== メイン画面 ====== -->
@@ -612,9 +601,6 @@
               <span id="settings-room-code" class="room-code-mono"></span>
               <button type="button" id="settings-copy-code" class="btn-copy">コピー</button>
             </div>
-            <div class="room-code-inline" style="margin-top:8px;">
-              <button type="button" id="settings-copy-invite-link" class="btn-copy">10分招待リンクをコピー</button>
-            </div>
             <p class="room-code-hint-sm">この合言葉で相手とグループを共有できます</p>
           </div>
           <div class="form-group">
@@ -751,10 +737,9 @@
   <script src="app.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations()
-        .then(regs => Promise.all(regs.map(r => r.unregister())))
-        .then(() => console.log('SW unregistered'))
-        .catch(e => console.warn('SW unregister failed:', e));
+      navigator.serviceWorker.register('./sw.js')
+        .then(() => console.log('SW registered'))
+        .catch(e => console.warn('SW registration failed:', e));
     }
     (function generateAppleTouchIcon() {
       try {
