@@ -1,5 +1,5 @@
 // ふたりの割り勘帳 — Service Worker
-const CACHE_NAME = 'warikan-v14';
+const CACHE_NAME = 'warikan-v15';
 const ASSETS = [
   './',
   './index.html',
@@ -34,63 +34,31 @@ self.addEventListener('fetch', event => {
   const req = event.request;
   const url = new URL(req.url);
 
-  // 拡張機能や非GETリクエストとは競合しない
+  // 拡張機能や非GET/非http(s)は対象外
   if (req.method !== 'GET') return;
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
 
-  // HTMLナビゲーションは常にネットワーク優先（古いindex.html固定化を防ぐ）
-  if (req.mode === 'navigate') {
-    event.respondWith(
-      fetch(req)
-        .then(response => {
-          if (response && response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put('./index.html', clone));
-          }
-          return response;
-        })
-        .catch(async () => {
-          const cached = await caches.match('./index.html');
-          if (cached) return cached;
-          throw new Error('offline and no cached index');
-        })
-    );
-    return;
-  }
+  // HTML(document/navigate)は常にブラウザ標準のネットワーク処理に任せる
+  // （一瞬表示→消えるような stale HTML 問題を避ける）
+  if (req.mode === 'navigate' || req.destination === 'document') return;
 
-  // Google Fonts 等の外部リソースはネットワーク優先
-  if (url.origin !== self.location.origin) {
-    event.respondWith(
-      fetch(req)
-        .then(response => {
-          // 外部は無差別キャッシュせず、そのまま返す
-          return response;
-        })
-        .catch(() => caches.match(req))
-    );
-    return;
-  }
+  // 外部リソースは触らない
+  if (url.origin !== self.location.origin) return;
 
-  // 自サイトのリソースはキャッシュ優先
+  // 同一オリジンの静的アセットのみをキャッシュ対象にする
+  const staticAsset = /\.(?:css|js|json|svg|png|jpg|jpeg|webp|woff2?)$/i.test(url.pathname);
+  if (!staticAsset) return;
+
   event.respondWith(
-    caches.match(req)
-      .then(cached => {
-        if (cached) {
-          // バックグラウンドでキャッシュを更新
-          fetch(req).then(response => {
-            if (response && response.ok) {
-              caches.open(CACHE_NAME).then(cache => cache.put(req, response));
-            }
-          }).catch(() => {});
-          return cached;
+    caches.match(req).then(cached => {
+      if (cached) return cached;
+      return fetch(req).then(response => {
+        if (response && response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(req, clone));
         }
-        return fetch(req).then(response => {
-          if (response && response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(req, clone));
-          }
-          return response;
-        });
-      })
+        return response;
+      });
+    })
   );
 });
