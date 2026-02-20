@@ -1,5 +1,5 @@
 // ふたりの割り勘帳 — Service Worker
-const CACHE_NAME = 'warikan-v13';
+const CACHE_NAME = 'warikan-v14';
 const ASSETS = [
   './',
   './index.html',
@@ -37,6 +37,26 @@ self.addEventListener('fetch', event => {
   // 拡張機能や非GETリクエストとは競合しない
   if (req.method !== 'GET') return;
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+
+  // HTMLナビゲーションは常にネットワーク優先（古いindex.html固定化を防ぐ）
+  if (req.mode === 'navigate') {
+    event.respondWith(
+      fetch(req)
+        .then(response => {
+          if (response && response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put('./index.html', clone));
+          }
+          return response;
+        })
+        .catch(async () => {
+          const cached = await caches.match('./index.html');
+          if (cached) return cached;
+          throw new Error('offline and no cached index');
+        })
+    );
+    return;
+  }
 
   // Google Fonts 等の外部リソースはネットワーク優先
   if (url.origin !== self.location.origin) {
